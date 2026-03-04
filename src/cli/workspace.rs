@@ -63,7 +63,11 @@ pub async fn handle_init(
 
 pub async fn handle_sync(workspace_root: &Path, full: bool) -> Result<()> {
   let ws_config = config::load_workspace_config(workspace_root)?;
-  let token = auth::get_token(&ws_config.workspace.name)?;
+  let token = auth::get_token_with_config(
+    &ws_config.workspace.name,
+    ws_config.platform.token.as_deref(),
+    None,
+  )?;
   let plat = platform::create_platform(&ws_config.platform, &token).await?;
 
   println!("Syncing challenges...");
@@ -143,7 +147,11 @@ pub async fn handle_sync(workspace_root: &Path, full: bool) -> Result<()> {
 
 pub async fn handle_status(workspace_root: &Path) -> Result<()> {
   let ws_config = config::load_workspace_config(workspace_root)?;
-  let token = auth::get_token(&ws_config.workspace.name)?;
+  let token = auth::get_token_with_config(
+    &ws_config.workspace.name,
+    ws_config.platform.token.as_deref(),
+    None,
+  )?;
   let plat = platform::create_platform(&ws_config.platform, &token).await?;
 
   let info = plat.whoami().await?;
@@ -210,7 +218,11 @@ pub async fn handle_files(
   id_or_name: &str,
 ) -> Result<()> {
   let ws_config = config::load_workspace_config(workspace_root)?;
-  let token = auth::get_token(&ws_config.workspace.name)?;
+  let token = auth::get_token_with_config(
+    &ws_config.workspace.name,
+    ws_config.platform.token.as_deref(),
+    None,
+  )?;
   let plat = platform::create_platform(&ws_config.platform, &token).await?;
 
   let challenges = plat.challenges().await?;

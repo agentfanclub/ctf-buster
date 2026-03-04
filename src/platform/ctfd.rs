@@ -1,5 +1,6 @@
 use std::path::Path;
 use std::sync::Arc;
+use tokio::sync::OnceCell;
 
 use async_trait::async_trait;
 use reqwest::Client;
@@ -18,6 +19,7 @@ pub struct CtfdPlatform {
   base_url: String,
   auth: AuthMethod,
   client: Client,
+  csrf_nonce: OnceCell<String>,
 }
 
 impl CtfdPlatform {
@@ -46,7 +48,34 @@ impl CtfdPlatform {
       base_url,
       auth,
       client,
+      csrf_nonce: OnceCell::new(),
     }
+  }
+
+  /// Fetch CSRF nonce from CTFd (needed for session-based POST requests).
+  async fn get_csrf_nonce(&self) -> Result<&str> {
+    self
+      .csrf_nonce
+      .get_or_try_init(|| async {
+        let resp = self
+          .client
+          .get(format!("{}/challenges", self.base_url))
+          .send()
+          .await?;
+        let html = resp.text().await?;
+        let nonce = html
+          .find("csrfNonce")
+          .and_then(|pos| {
+            let after = &html[pos..];
+            let quote_start = after.find('"')? + 1;
+            let quote_end = quote_start + after[quote_start..].find('"')?;
+            Some(after[quote_start..quote_end].to_string())
+          })
+          .ok_or_else(|| Error::Platform("Could not find CSRF nonce in CTFd page".into()))?;
+        Ok(nonce)
+      })
+      .await
+      .map(|s| s.as_str())
   }
 
   fn api_url(&self, path: &str) -> String {
@@ -89,12 +118,18 @@ impl CtfdPlatform {
   }
 
   async fn post(&self, path: &str, payload: &serde_json::Value) -> Result<serde_json::Value> {
-    let req = self
+    let mut req = self
       .client
       .post(self.api_url(path))
       .header("Content-Type", "application/json")
       .json(payload);
-    let resp = self.apply_auth(req).send().await?;
+    req = self.apply_auth(req);
+    // Session auth requires CSRF nonce on POST requests
+    if matches!(self.auth, AuthMethod::Session) {
+      let nonce = self.get_csrf_nonce().await?;
+      req = req.header("CSRF-Token", nonce);
+    }
+    let resp = req.send().await?;
 
     let status = resp.status();
     let body: serde_json::Value = resp.json().await?;
