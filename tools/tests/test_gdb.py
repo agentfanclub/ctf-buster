@@ -11,12 +11,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import ctf_gdb
 
+
+def _unwrap(tool):
+    """Get underlying function from FastMCP tool wrapper (2.x .fn vs 3.x plain)."""
+    return getattr(tool, "fn", tool)
+
+
 # Access underlying functions from FastMCP tool wrappers
-gdb_run = ctf_gdb.gdb_run.fn
-gdb_break_inspect = ctf_gdb.gdb_break_inspect.fn
-gdb_trace_input = ctf_gdb.gdb_trace_input.fn
-gdb_memory_dump = ctf_gdb.gdb_memory_dump.fn
-gdb_checksec_runtime = ctf_gdb.gdb_checksec_runtime.fn
+gdb_run = _unwrap(ctf_gdb.gdb_run)
+gdb_break_inspect = _unwrap(ctf_gdb.gdb_break_inspect)
+gdb_trace_input = _unwrap(ctf_gdb.gdb_trace_input)
+gdb_memory_dump = _unwrap(ctf_gdb.gdb_memory_dump)
+gdb_checksec_runtime = _unwrap(ctf_gdb.gdb_checksec_runtime)
 
 
 # ── _build_gdb_script tests ──────────────────────────────────────────────────

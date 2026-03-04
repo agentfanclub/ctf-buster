@@ -11,13 +11,19 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import ctf_rev
 
+
+def _unwrap(tool):
+    """Get underlying function from FastMCP tool wrapper (2.x .fn vs 3.x plain)."""
+    return getattr(tool, "fn", tool)
+
+
 # Access underlying functions from FastMCP tool wrappers
-rev_functions = ctf_rev.rev_functions.fn
-rev_xrefs = ctf_rev.rev_xrefs.fn
-rev_decompile = ctf_rev.rev_decompile.fn
-rev_strings_xrefs = ctf_rev.rev_strings_xrefs.fn
-rev_cfg = ctf_rev.rev_cfg.fn
-rev_diff = ctf_rev.rev_diff.fn
+rev_functions = _unwrap(ctf_rev.rev_functions)
+rev_xrefs = _unwrap(ctf_rev.rev_xrefs)
+rev_decompile = _unwrap(ctf_rev.rev_decompile)
+rev_strings_xrefs = _unwrap(ctf_rev.rev_strings_xrefs)
+rev_cfg = _unwrap(ctf_rev.rev_cfg)
+rev_diff = _unwrap(ctf_rev.rev_diff)
 
 
 # ── _parse_r2_json tests ────────────────────────────────────────────────────

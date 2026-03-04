@@ -15,12 +15,17 @@ import ctf_crypto
 # _apply_op is a plain function (not decorated with @mcp.tool)
 _apply_op = ctf_crypto._apply_op
 
-# Decorated @mcp.tool functions become FunctionTool objects;
-# access the underlying function via .fn
-transform_chain = ctf_crypto.crypto_transform_chain.fn
-crypto_identify = ctf_crypto.crypto_identify.fn
-frequency_analysis = ctf_crypto.crypto_frequency_analysis.fn
-hash_crack = ctf_crypto.crypto_hash_crack.fn
+
+def _unwrap(tool):
+    """Get underlying function from FastMCP tool wrapper (2.x .fn vs 3.x plain)."""
+    return getattr(tool, "fn", tool)
+
+
+# Decorated @mcp.tool functions — unwrap for direct calling in tests
+transform_chain = _unwrap(ctf_crypto.crypto_transform_chain)
+crypto_identify = _unwrap(ctf_crypto.crypto_identify)
+frequency_analysis = _unwrap(ctf_crypto.crypto_frequency_analysis)
+hash_crack = _unwrap(ctf_crypto.crypto_hash_crack)
 
 # ── _apply_op tests ──────────────────────────────────────────────────────────
 
@@ -552,7 +557,7 @@ class TestHashCrack:
 
 # ── crypto_rsa_toolkit tests ─────────────────────────────────────────────────
 
-rsa_toolkit = ctf_crypto.crypto_rsa_toolkit.fn
+rsa_toolkit = _unwrap(ctf_crypto.crypto_rsa_toolkit)
 
 
 class TestRsaToolkitGivenPQ:
@@ -711,7 +716,7 @@ class TestRsaToolkitAuto:
 
 # ── crypto_math_solve tests ──────────────────────────────────────────────────
 
-math_solve = ctf_crypto.crypto_math_solve.fn
+math_solve = _unwrap(ctf_crypto.crypto_math_solve)
 
 
 class TestMathSolveEval:
@@ -798,7 +803,7 @@ class TestMathSolveUnknownMode:
 
 # ── crypto_xor_analyze tests ────────────────────────────────────────────────
 
-xor_analyze = ctf_crypto.crypto_xor_analyze.fn
+xor_analyze = _unwrap(ctf_crypto.crypto_xor_analyze)
 
 
 class TestXorAnalyzeKnownPlaintext:
@@ -892,7 +897,7 @@ class TestXorAnalyzeEdgeCases:
 
 # ── crypto_sage_solve tests ─────────────────────────────────────────────────
 
-sage_solve = ctf_crypto.crypto_sage_solve.fn
+sage_solve = _unwrap(ctf_crypto.crypto_sage_solve)
 
 
 class TestSageSolve:

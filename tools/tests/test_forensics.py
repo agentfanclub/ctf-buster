@@ -19,11 +19,17 @@ from ctf_forensics import (
     _entropy_interpretation,
 )
 
-file_triage = ctf_forensics.forensics_file_triage.fn
-stego_analyze = ctf_forensics.forensics_stego_analyze.fn
-extract_embedded = ctf_forensics.forensics_extract_embedded.fn
-entropy_analysis = ctf_forensics.forensics_entropy_analysis.fn
-image_analysis = ctf_forensics.forensics_image_analysis.fn
+
+def _unwrap(tool):
+    """Get underlying function from FastMCP tool wrapper (2.x .fn vs 3.x plain)."""
+    return getattr(tool, "fn", tool)
+
+
+file_triage = _unwrap(ctf_forensics.forensics_file_triage)
+stego_analyze = _unwrap(ctf_forensics.forensics_stego_analyze)
+extract_embedded = _unwrap(ctf_forensics.forensics_extract_embedded)
+entropy_analysis = _unwrap(ctf_forensics.forensics_entropy_analysis)
+image_analysis = _unwrap(ctf_forensics.forensics_image_analysis)
 
 # ── _calculate_entropy tests ─────────────────────────────────────────────────
 
@@ -601,7 +607,7 @@ class TestJsonOutput:
 
 # ── forensics_volatility tests ──────────────────────────────────────────────
 
-volatility = ctf_forensics.forensics_volatility.fn
+volatility = _unwrap(ctf_forensics.forensics_volatility)
 
 
 class TestVolatility:

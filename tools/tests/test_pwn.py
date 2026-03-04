@@ -12,15 +12,21 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import ctf_pwn
 
+
+def _unwrap(tool):
+    """Get underlying function from FastMCP tool wrapper (2.x .fn vs 3.x plain)."""
+    return getattr(tool, "fn", tool)
+
+
 # Access the underlying functions from FastMCP tool wrappers
-pwn_triage = ctf_pwn.pwn_triage.fn
+pwn_triage = _unwrap(ctf_pwn.pwn_triage)
 _pwn_triage_impl = ctf_pwn._pwn_triage_impl
-disassemble = ctf_pwn.pwn_disassemble.fn
-find_rop_gadgets = ctf_pwn.pwn_rop_gadgets.fn
-pattern_offset = ctf_pwn.pwn_pattern_offset.fn
-shellcode_generate = ctf_pwn.pwn_shellcode_generate.fn
-pwntools_template = ctf_pwn.pwn_pwntools_template.fn
-angr_analyze = ctf_pwn.pwn_angr_analyze.fn
+disassemble = _unwrap(ctf_pwn.pwn_disassemble)
+find_rop_gadgets = _unwrap(ctf_pwn.pwn_rop_gadgets)
+pattern_offset = _unwrap(ctf_pwn.pwn_pattern_offset)
+shellcode_generate = _unwrap(ctf_pwn.pwn_shellcode_generate)
+pwntools_template = _unwrap(ctf_pwn.pwn_pwntools_template)
+angr_analyze = _unwrap(ctf_pwn.pwn_angr_analyze)
 
 
 # ── DANGEROUS_FUNCS constant ─────────────────────────────────────────────────
@@ -426,7 +432,7 @@ class TestJsonOutput:
 
 # ── pwn_one_gadget tests ────────────────────────────────────────────────────
 
-one_gadget = ctf_pwn.pwn_one_gadget.fn
+one_gadget = _unwrap(ctf_pwn.pwn_one_gadget)
 
 
 class TestOneGadget:
@@ -477,7 +483,7 @@ class TestOneGadget:
 
 # ── pwn_libc_lookup tests ───────────────────────────────────────────────────
 
-libc_lookup = ctf_pwn.pwn_libc_lookup.fn
+libc_lookup = _unwrap(ctf_pwn.pwn_libc_lookup)
 
 
 class TestLibcLookup:
@@ -566,7 +572,7 @@ class TestLibcLookup:
 
 # ── pwn_format_string tests ─────────────────────────────────────────────────
 
-format_string = ctf_pwn.pwn_format_string.fn
+format_string = _unwrap(ctf_pwn.pwn_format_string)
 
 
 class TestFormatString:
