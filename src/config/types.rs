@@ -48,30 +48,6 @@ fn default_true() -> bool {
   true
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GlobalConfig {
-  #[serde(default)]
-  pub defaults: GlobalDefaults,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GlobalDefaults {
-  #[serde(default = "default_output")]
-  pub output: String,
-}
-
-impl Default for GlobalDefaults {
-  fn default() -> Self {
-    Self {
-      output: default_output(),
-    }
-  }
-}
-
-fn default_output() -> String {
-  "table".to_string()
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;

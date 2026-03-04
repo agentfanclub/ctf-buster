@@ -29,12 +29,14 @@ impl CtfdPlatform {
     let (auth, client) = if token.contains('.') && !token.starts_with("ctfd_") {
       // Session cookie — build client with cookie jar
       let jar = Arc::new(reqwest::cookie::Jar::default());
-      let url_parsed = base_url.parse::<url::Url>().unwrap();
+      let url_parsed: url::Url = base_url
+        .parse()
+        .unwrap_or_else(|_| "http://localhost".parse().unwrap());
       jar.add_cookie_str(&format!("session={token}"), &url_parsed);
       let client = Client::builder()
         .cookie_provider(jar)
         .build()
-        .expect("failed to build HTTP client");
+        .unwrap_or_default();
       (AuthMethod::Session, client)
     } else {
       (AuthMethod::Token(token), Client::new())
@@ -329,47 +331,6 @@ impl Platform for CtfdPlatform {
     let bytes = resp.bytes().await?;
     tokio::fs::write(dest, &bytes).await?;
     Ok(())
-  }
-
-  async fn solves(&self, challenge_id: &str) -> Result<Vec<SolveInfo>> {
-    let body = self
-      .get(&format!("/challenges/{challenge_id}/solves"))
-      .await?;
-    let data = body
-      .get("data")
-      .ok_or_else(|| Error::Platform("Missing data field".into()))?;
-
-    let mut solves = Vec::new();
-    if let Some(arr) = data.as_array() {
-      for solve in arr {
-        let challenge_name = solve
-          .get("challenge")
-          .and_then(|c| c.get("name"))
-          .and_then(|n| n.as_str())
-          .unwrap_or("")
-          .to_string();
-        let solved_at = solve
-          .get("date")
-          .and_then(|d| d.as_str())
-          .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-          .map(|dt| dt.with_timezone(&chrono::Utc))
-          .unwrap_or_default();
-        let points = solve
-          .get("challenge")
-          .and_then(|c| c.get("value"))
-          .and_then(|v| v.as_u64())
-          .unwrap_or(0) as u32;
-
-        solves.push(SolveInfo {
-          challenge_id: challenge_id.to_string(),
-          challenge_name,
-          solved_at,
-          points,
-        });
-      }
-    }
-
-    Ok(solves)
   }
 
   async fn unlock_hint(&self, hint_id: &str) -> Result<Hint> {

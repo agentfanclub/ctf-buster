@@ -82,7 +82,8 @@ pub async fn handle_sync(workspace_root: &Path, full: bool) -> Result<()> {
     let dist_dir = challenge_dir.join("dist");
 
     for file in &challenge.files {
-      let dest = dist_dir.join(&file.name);
+      let safe_name = scaffold::sanitize_filename(&file.name);
+      let dest = dist_dir.join(&safe_name);
       if !dest.exists() {
         std::fs::create_dir_all(&dist_dir)?;
         if let Err(e) = plat.download_file(file, &dest).await {
@@ -226,7 +227,8 @@ pub async fn handle_files(
   std::fs::create_dir_all(&dist_dir)?;
 
   for file in &challenge.files {
-    let dest = dist_dir.join(&file.name);
+    let safe_name = scaffold::sanitize_filename(&file.name);
+    let dest = dist_dir.join(&safe_name);
     print!("  Downloading {}...", file.name);
     plat.download_file(file, &dest).await?;
     println!(" {}", "✓".green());

@@ -171,7 +171,8 @@ impl McpServer {
       let dist_dir = challenge_dir.join("dist");
 
       for file in &challenge.files {
-        let dest = dist_dir.join(&file.name);
+        let safe_name = scaffold::sanitize_filename(&file.name);
+        let dest = dist_dir.join(&safe_name);
         if !dest.exists() {
           std::fs::create_dir_all(&dist_dir).map_err(to_mcp_error)?;
           if let Err(e) = self.platform.download_file(file, &dest).await {
@@ -242,7 +243,8 @@ impl McpServer {
 
     let mut downloaded = Vec::new();
     for file in &challenge.files {
-      let dest = dist_dir.join(&file.name);
+      let safe_name = scaffold::sanitize_filename(&file.name);
+      let dest = dist_dir.join(&safe_name);
       self
         .platform
         .download_file(file, &dest)

@@ -46,7 +46,7 @@
           # Python environment matching ~/.nixos-config/modules/programs/python.nix
           python3 = pkgs.python3.override {
             packageOverrides = _pyfinal: pyprev: {
-              angr = pyprev.angr.overridePythonAttrs (old: {
+              angr = pyprev.angr.overridePythonAttrs {
                 version = "9.2.154";
                 src = pkgs.fetchFromGitHub {
                   owner = "angr";
@@ -56,7 +56,7 @@
                 };
                 pythonImportsCheck = [ ];
                 doCheck = false;
-              });
+              };
               ailment = pyprev.ailment.overridePythonAttrs {
                 version = "9.2.154";
                 src = pkgs.fetchFromGitHub {
@@ -111,6 +111,9 @@
               z3-solver
               # MCP server framework
               fastmcp
+              # Testing
+              pytest
+              pytest-cov
             ]
           );
 
@@ -238,7 +241,7 @@
             rizin
             rlwrap
             rustscan
-            sage
+            (sage.override { requireSageTests = false; })
             samba
             seclists
             sherlock
@@ -278,12 +281,14 @@
             wifite2
             wireguard-tools
             wireshark-cli
-            # wordlists — broken wfuzz dep; seclists is included separately
             wpscan
             xh
             xxd
             yara
             zsteg
+
+            # Container tooling
+            docker-client
           ];
         in
         {
@@ -297,6 +302,7 @@
               pkgs.pkg-config
               pkgs.openssl
               pkgs.dbus
+              pkgs.cargo-tarpaulin
 
               # Python with security packages + fastmcp
               pythonEnv

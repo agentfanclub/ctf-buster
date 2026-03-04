@@ -48,6 +48,26 @@ pub fn scaffold_challenge(
   Ok(true)
 }
 
+/// Sanitize a filename to prevent path traversal attacks.
+/// Strips directory components and replaces dangerous characters.
+pub fn sanitize_filename(name: &str) -> String {
+  // Take only the filename component (strip any directory traversal)
+  let name = Path::new(name)
+    .file_name()
+    .and_then(|n| n.to_str())
+    .unwrap_or("unknown");
+  // Remove any remaining path separators or null bytes
+  let sanitized: String = name
+    .chars()
+    .filter(|&c| c != '\0' && c != '/' && c != '\\')
+    .collect();
+  if sanitized.is_empty() || sanitized == "." || sanitized == ".." {
+    "unknown".to_string()
+  } else {
+    sanitized
+  }
+}
+
 fn sanitize_name(name: &str) -> String {
   name
     .to_lowercase()
@@ -187,6 +207,27 @@ mod tests {
 
     assert!(scaffold_challenge(dir.path(), &c, &config).unwrap());
     assert!(!scaffold_challenge(dir.path(), &c, &config).unwrap());
+  }
+
+  #[test]
+  fn sanitize_filename_strips_path_traversal() {
+    assert_eq!(sanitize_filename("../../.bashrc"), ".bashrc");
+    assert_eq!(sanitize_filename("../../../etc/passwd"), "passwd");
+    assert_eq!(sanitize_filename(".."), "unknown");
+    assert_eq!(sanitize_filename("."), "unknown");
+    assert_eq!(sanitize_filename(""), "unknown");
+  }
+
+  #[test]
+  fn sanitize_filename_preserves_normal_names() {
+    assert_eq!(sanitize_filename("output.txt"), "output.txt");
+    assert_eq!(sanitize_filename("challenge.py"), "challenge.py");
+    assert_eq!(sanitize_filename("flag.enc"), "flag.enc");
+  }
+
+  #[test]
+  fn sanitize_filename_strips_null_bytes() {
+    assert_eq!(sanitize_filename("file\0.txt"), "file.txt");
   }
 
   #[test]

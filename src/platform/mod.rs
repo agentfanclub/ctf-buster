@@ -20,7 +20,6 @@ pub trait Platform: Send + Sync {
   async fn submit(&self, challenge_id: &str, flag: &str) -> Result<SubmitResult>;
   async fn scoreboard(&self, limit: Option<u32>) -> Result<Vec<ScoreboardEntry>>;
   async fn download_file(&self, file: &ChallengeFile, dest: &Path) -> Result<()>;
-  async fn solves(&self, challenge_id: &str) -> Result<Vec<SolveInfo>>;
   async fn unlock_hint(&self, hint_id: &str) -> Result<Hint>;
 }
 

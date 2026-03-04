@@ -41,15 +41,16 @@ pub async fn handle_submit(
 
   // Update local state on success
   if let SubmitResult::Correct { challenge, points } = &result {
-    if let Ok(ws_config) = config::load_workspace_config(workspace_root) {
-      let _ = state::mark_solved(
+    if config::load_workspace_config(workspace_root).is_ok() {
+      if let Err(e) = state::mark_solved(
         workspace_root,
         &challenge_id,
         challenge,
         *points,
         &flag,
-      );
-      let _ = ws_config; // suppress unused warning
+      ) {
+        eprintln!("Warning: failed to update local state: {e}");
+      }
     }
   }
 

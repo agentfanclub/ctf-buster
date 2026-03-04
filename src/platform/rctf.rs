@@ -282,48 +282,6 @@ impl Platform for RctfPlatform {
     Ok(())
   }
 
-  async fn solves(&self, challenge_id: &str) -> Result<Vec<SolveInfo>> {
-    let body = self
-      .get(&format!("/challs/{challenge_id}/solves"))
-      .await?;
-    let data = body
-      .get("data")
-      .ok_or_else(|| Error::Platform("Missing data field".into()))?;
-
-    let mut solves = Vec::new();
-    if let Some(arr) = data.as_array() {
-      for solve in arr {
-        let challenge_name = solve
-          .get("challengeName")
-          .or_else(|| solve.get("name"))
-          .and_then(|n| n.as_str())
-          .unwrap_or("")
-          .to_string();
-        let solved_at = solve
-          .get("createdAt")
-          .and_then(|d| d.as_u64())
-          .map(|ts| {
-            chrono::DateTime::from_timestamp(ts as i64 / 1000, 0)
-              .unwrap_or_default()
-          })
-          .unwrap_or_default();
-        let points = solve
-          .get("points")
-          .and_then(|p| p.as_u64())
-          .unwrap_or(0) as u32;
-
-        solves.push(SolveInfo {
-          challenge_id: challenge_id.to_string(),
-          challenge_name,
-          solved_at,
-          points,
-        });
-      }
-    }
-
-    Ok(solves)
-  }
-
   async fn unlock_hint(&self, _hint_id: &str) -> Result<Hint> {
     Err(Error::Platform(
       "rCTF does not support hint unlocking".into(),

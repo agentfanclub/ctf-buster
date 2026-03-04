@@ -1,14 +1,33 @@
-/target
-PLAN.md
-.direnv/
+# Build artifacts
+/target/
 result
 
-# Credentials and test data
+# Nix
+.direnv/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.coverage
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Credentials & secrets
 .env
 *.cookie
 *.token
+
+# CTF workspace test data
 test-workspace/
 
-.claude
-.venv
-__pycache__/
+# Claude Code
+.claude/
+
+# Planning (not shipped)
+PLAN.md

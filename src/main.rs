@@ -15,7 +15,7 @@ async fn main() {
   tracing_subscriber::fmt()
     .with_env_filter(
       tracing_subscriber::EnvFilter::from_default_env()
-        .add_directive("ctf_buster=info".parse().unwrap()),
+        .add_directive("ctf_buster=info".parse().expect("valid directive")),
     )
     .without_time()
     .init();

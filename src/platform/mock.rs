@@ -136,10 +136,6 @@ impl Platform for MockPlatform {
     Ok(())
   }
 
-  async fn solves(&self, _challenge_id: &str) -> Result<Vec<SolveInfo>> {
-    Ok(vec![])
-  }
-
   async fn unlock_hint(&self, hint_id: &str) -> Result<Hint> {
     Ok(Hint {
       id: hint_id.into(),

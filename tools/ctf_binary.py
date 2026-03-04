@@ -499,5 +499,190 @@ def pwntools_template(
     )
 
 
+# ── angr_analyze ─────────────────────────────────────────────────────────────
+
+
+@mcp.tool()
+def angr_analyze(
+    path: str,
+    mode: str = "auto",
+    target_addr: str = "",
+    avoid_addrs: str = "",
+    find_string: str = "",
+    stdin_length: int = 64,
+) -> str:
+    """Use angr for automatic symbolic execution and constraint solving on binaries.
+
+    Best for: simple stack-based challenges, finding inputs that reach a target,
+    solving password checks, and exploring reachable paths.
+
+    Args:
+        path: Path to the binary
+        mode: Analysis mode:
+            - "auto": Try to find a path that prints flag-like output
+            - "find_addr": Find input reaching target_addr (hex)
+            - "find_string": Find input that causes find_string to appear in stdout
+            - "explore": Explore execution paths and report reachable functions
+        target_addr: Target address for find_addr mode (hex, e.g. "0x401234")
+        avoid_addrs: Comma-separated addresses to avoid (hex)
+        find_string: String to search for in stdout for find_string/auto modes
+        stdin_length: Maximum stdin input length for symbolic buffer (default 64)
+    """
+    path = os.path.realpath(path)
+    if not os.path.isfile(path):
+        return json.dumps({"error": f"File not found: {path}"})
+
+    try:
+        import angr
+        import claripy
+    except ImportError:
+        return json.dumps(
+            {"error": "angr not available — install with: pip install angr"}
+        )
+
+    try:
+        proj = angr.Project(path, auto_load_libs=False)
+    except Exception as e:
+        return json.dumps({"error": f"Failed to load binary: {e}"})
+
+    result = {
+        "binary": path,
+        "arch": proj.arch.name,
+        "mode": mode,
+    }
+
+    avoid_list = []
+    if avoid_addrs:
+        avoid_list = [int(a.strip(), 16) for a in avoid_addrs.split(",") if a.strip()]
+
+    try:
+        # Create symbolic stdin
+        sym_input = claripy.BVS("stdin", stdin_length * 8)
+        state = proj.factory.entry_state(
+            stdin=angr.SimFileStream(name="stdin", content=sym_input),
+        )
+
+        simgr = proj.factory.simulation_manager(state)
+
+        if mode == "find_addr" and target_addr:
+            target = int(target_addr, 16)
+            simgr.explore(find=target, avoid=avoid_list, timeout=120)
+
+            if simgr.found:
+                found_state = simgr.found[0]
+                solution = found_state.solver.eval(sym_input, cast_to=bytes)
+                # Trim trailing nulls
+                solution = solution.rstrip(b"\x00")
+                stdout_output = found_state.posix.dumps(1)
+
+                result["status"] = "found"
+                result["input_hex"] = solution.hex()
+                result["input_ascii"] = solution.decode("latin-1", errors="replace")
+                result["input_repr"] = repr(solution)
+                result["stdout"] = stdout_output.decode("latin-1", errors="replace")[
+                    :2000
+                ]
+            else:
+                result["status"] = "not_found"
+                result["deadended"] = len(simgr.deadended)
+                result["active"] = len(simgr.active)
+
+        elif mode == "find_string" and find_string:
+
+            def check_stdout(s):
+                out = s.posix.dumps(1)
+                return find_string.encode() in out
+
+            simgr.explore(find=check_stdout, avoid=avoid_list, timeout=120)
+
+            if simgr.found:
+                found_state = simgr.found[0]
+                solution = found_state.solver.eval(sym_input, cast_to=bytes)
+                solution = solution.rstrip(b"\x00")
+                stdout_output = found_state.posix.dumps(1)
+
+                result["status"] = "found"
+                result["input_hex"] = solution.hex()
+                result["input_ascii"] = solution.decode("latin-1", errors="replace")
+                result["input_repr"] = repr(solution)
+                result["stdout"] = stdout_output.decode("latin-1", errors="replace")[
+                    :2000
+                ]
+                result["matched_string"] = find_string
+            else:
+                result["status"] = "not_found"
+                result["deadended"] = len(simgr.deadended)
+
+        elif mode == "auto":
+            # Auto mode: look for flag-like output patterns
+            flag_patterns = [b"flag{", b"CTF{", b"ctf{", b"FLAG{"]
+            if find_string:
+                flag_patterns.insert(0, find_string.encode())
+
+            def check_flag(s):
+                out = s.posix.dumps(1)
+                return any(pat in out for pat in flag_patterns)
+
+            def check_fail(s):
+                out = s.posix.dumps(1)
+                fail_patterns = [b"Wrong", b"Incorrect", b"denied", b"FAIL", b"Nope"]
+                return any(pat in out for pat in fail_patterns)
+
+            simgr.explore(
+                find=check_flag,
+                avoid=check_fail if not avoid_list else avoid_list,
+                timeout=120,
+            )
+
+            if simgr.found:
+                found_state = simgr.found[0]
+                solution = found_state.solver.eval(sym_input, cast_to=bytes)
+                solution = solution.rstrip(b"\x00")
+                stdout_output = found_state.posix.dumps(1)
+
+                result["status"] = "found"
+                result["input_hex"] = solution.hex()
+                result["input_ascii"] = solution.decode("latin-1", errors="replace")
+                result["input_repr"] = repr(solution)
+                result["stdout"] = stdout_output.decode("latin-1", errors="replace")[
+                    :2000
+                ]
+            else:
+                result["status"] = "not_found"
+                result["deadended"] = len(simgr.deadended)
+                result["active"] = len(simgr.active)
+                result["note"] = (
+                    "Auto mode did not find flag-like output. "
+                    "Try find_addr with a specific target or increase stdin_length."
+                )
+
+        elif mode == "explore":
+            # Just explore and report what we find
+            simgr.run(until=lambda sm: len(sm.active) == 0 or len(sm.deadended) > 50)
+
+            result["status"] = "explored"
+            result["deadended_count"] = len(simgr.deadended)
+            result["active_count"] = len(simgr.active)
+
+            # Collect unique stdout outputs
+            outputs = set()
+            for s in simgr.deadended[:20]:
+                out = s.posix.dumps(1).decode("latin-1", errors="replace")[:500]
+                if out.strip():
+                    outputs.add(out)
+            result["unique_outputs"] = list(outputs)[:10]
+
+        else:
+            result["error"] = (
+                f"Unknown mode: {mode}. Use auto, find_addr, find_string, or explore."
+            )
+
+    except Exception as e:
+        result["status"] = "error"
+        result["error"] = str(e)
+
+    return json.dumps(result, indent=2)
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")
