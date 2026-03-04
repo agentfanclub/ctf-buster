@@ -548,3 +548,249 @@ class TestHashCrack:
         assert "hash" in parsed
         assert "length" in parsed
         assert "possible_types" in parsed
+
+
+# ── crypto_rsa_toolkit tests ─────────────────────────────────────────────────
+
+rsa_toolkit = ctf_crypto.crypto_rsa_toolkit.fn
+
+
+class TestRsaToolkitGivenPQ:
+    """Tests for RSA decryption when p and q are provided directly."""
+
+    def test_given_pq_computes_d(self):
+        p, q = 61, 53
+        n = p * q
+        e = 17
+        result = json.loads(rsa_toolkit(str(n), e=e, p=str(p), q=str(q)))
+        assert "d" in result
+        d = int(result["d"])
+        phi = (p - 1) * (q - 1)
+        assert (e * d) % phi == 1
+
+    def test_given_pq_decrypts_ciphertext(self):
+        p, q = 61, 53
+        n = p * q
+        e = 17
+        m = 42
+        c = pow(m, e, n)
+        result = json.loads(rsa_toolkit(str(n), e=e, c=str(c), p=str(p), q=str(q)))
+        assert result["m"] == str(m)
+
+    def test_given_pq_returns_p_and_q(self):
+        p, q = 101, 103
+        n = p * q
+        result = json.loads(rsa_toolkit(str(n), p=str(p), q=str(q)))
+        assert result["p"] == str(p)
+        assert result["q"] == str(q)
+
+    def test_given_pq_returns_valid_json(self):
+        raw = rsa_toolkit("3233", e=17, p="61", q="53")
+        parsed = json.loads(raw)
+        assert "n_bits" in parsed
+        assert "e" in parsed
+
+
+class TestRsaToolkitSmallE:
+    """Tests for the small_e attack (when e is small and m^e < n)."""
+
+    def test_small_e_exact_root(self):
+        # m^3 without modular reduction → cube root recovers m
+        m = 42
+        e = 3
+        c = m**e
+        n = c + 1000000  # n > c so m^e < n
+        result = json.loads(rsa_toolkit(str(n), e=e, c=str(c), attack="small_e"))
+        assert result.get("attack_used") == "small_e"
+        assert result["m"] == str(m)
+
+    def test_small_e_no_exact_root_returns_no_attack(self):
+        # When c is not an exact e-th root, attack should fail
+        e = 3
+        c = 100  # not a perfect cube
+        n = 10**10
+        result = json.loads(rsa_toolkit(str(n), e=e, c=str(c), attack="small_e"))
+        assert "attack_used" not in result
+
+    def test_small_e_skipped_for_large_e(self):
+        # e > 17 should skip small_e attack
+        c = 8  # perfect cube
+        n = 1000
+        result = json.loads(rsa_toolkit(str(n), e=65537, c=str(c), attack="small_e"))
+        assert "attack_used" not in result
+
+
+class TestRsaToolkitFermat:
+    """Tests for Fermat factorization (when p and q are close)."""
+
+    def test_fermat_close_primes(self):
+        # Two primes close together — Fermat should factor quickly
+        p, q = 1000000007, 1000000009
+        n = p * q
+        result = json.loads(rsa_toolkit(str(n), attack="fermat"))
+        assert result.get("attack_used") == "fermat"
+        factors = {int(result["p"]), int(result["q"])}
+        assert factors == {p, q}
+
+    def test_fermat_with_decryption(self):
+        p, q = 1000000007, 1000000009
+        n = p * q
+        e = 65537
+        m = 123456789
+        c = pow(m, e, n)
+        result = json.loads(rsa_toolkit(str(n), e=e, c=str(c), attack="fermat"))
+        assert result.get("attack_used") == "fermat"
+        assert result["m"] == str(m)
+
+    def test_fermat_fails_for_distant_primes(self):
+        # Very distant primes — Fermat won't factor in 10k iterations
+        p, q = 7, 1000000007
+        n = p * q
+        result = json.loads(rsa_toolkit(str(n), attack="fermat"))
+        assert "attack_used" not in result
+
+
+class TestRsaToolkitWiener:
+    """Tests for Wiener's attack (when d is small relative to n^(1/4))."""
+
+    def test_wiener_small_d(self):
+        # Wiener's attack requires d < n^(1/4) / 3
+        # These parameters were verified to produce a successful continued-fraction attack
+        p = 18446744073709551629
+        q = 73786976294838206473
+        n = p * q
+        phi = (p - 1) * (q - 1)
+        d = 89
+        e = pow(d, -1, phi)
+
+        result = json.loads(rsa_toolkit(str(n), e=e, attack="wiener"))
+        assert result.get("attack_used") == "wiener"
+        factors = {int(result["p"]), int(result["q"])}
+        assert factors == {p, q}
+        assert int(result["d"]) == d
+
+    def test_wiener_with_decryption(self):
+        p = 18446744073709551629
+        q = 73786976294838206473
+        n = p * q
+        phi = (p - 1) * (q - 1)
+        d = 89
+        e = pow(d, -1, phi)
+        m = 42
+        c = pow(m, e, n)
+
+        result = json.loads(rsa_toolkit(str(n), e=e, c=str(c), attack="wiener"))
+        assert result.get("attack_used") == "wiener"
+        assert result["m"] == str(m)
+
+
+class TestRsaToolkitAuto:
+    """Tests for auto mode cycling through attacks."""
+
+    def test_auto_tries_multiple_attacks(self):
+        # Small e case should be found by auto
+        m = 7
+        e = 3
+        c = m**e
+        n = c + 1000000
+        result = json.loads(rsa_toolkit(str(n), e=e, c=str(c), attack="auto"))
+        assert result.get("attack_used") == "small_e"
+        assert "attacks_tried" in result
+
+    def test_auto_returns_attacks_tried_on_failure(self):
+        # A hard case that no attack will solve quickly
+        n = 2**127 - 1  # Mersenne prime — not a product of two factors
+        result = json.loads(rsa_toolkit(str(n), e=65537, c="42", attack="auto"))
+        assert "attacks_tried" in result
+        assert len(result["attacks_tried"]) > 0
+
+    def test_returns_n_bits(self):
+        result = json.loads(rsa_toolkit("3233"))
+        assert result["n_bits"] == (3233).bit_length()
+
+
+# ── crypto_math_solve tests ──────────────────────────────────────────────────
+
+math_solve = ctf_crypto.crypto_math_solve.fn
+
+
+class TestMathSolveEval:
+    """Tests for sympy eval mode."""
+
+    def test_eval_basic_arithmetic(self):
+        result = json.loads(math_solve("eval", "2**10"))
+        assert result["result"] == "1024"
+
+    def test_eval_pow_modular_inverse(self):
+        result = json.loads(math_solve("eval", "pow(7, -1, 13)"))
+        # 7 * 2 = 14 ≡ 1 (mod 13)
+        assert result["result"] == "2"
+
+    def test_eval_factorint(self):
+        result = json.loads(math_solve("eval", "factorint(12)"))
+        # sympy returns {2: 2, 3: 1}
+        assert "2" in result["result"]
+        assert "3" in result["result"]
+
+    def test_eval_gcd(self):
+        result = json.loads(math_solve("eval", "gcd(48, 18)"))
+        assert result["result"] == "6"
+
+    def test_eval_invalid_expression(self):
+        result = json.loads(math_solve("eval", "this is not valid python"))
+        assert "error" in result
+
+    def test_eval_returns_valid_json(self):
+        raw = math_solve("eval", "1 + 1")
+        parsed = json.loads(raw)
+        assert "result" in parsed
+
+    def test_eval_hex_conversion(self):
+        result = json.loads(math_solve("eval", "hex(255)"))
+        assert result["result"] == "0xff"
+
+    def test_eval_integer_nthroot(self):
+        result = json.loads(math_solve("eval", "integer_nthroot(27, 3)"))
+        # Returns (3, True)
+        assert "3" in result["result"]
+
+
+class TestMathSolveZ3:
+    """Tests for Z3 constraint solving mode."""
+
+    def test_z3_simple_system(self):
+        result = json.loads(math_solve("z3", "x + y == 10; x - y == 4", "x,y"))
+        assert result["status"] == "sat"
+        assert result["solution"]["x"] == "7"
+        assert result["solution"]["y"] == "3"
+
+    def test_z3_single_variable(self):
+        result = json.loads(math_solve("z3", "x * 2 == 42", "x"))
+        assert result["status"] == "sat"
+        assert result["solution"]["x"] == "21"
+
+    def test_z3_unsatisfiable(self):
+        result = json.loads(math_solve("z3", "x > 5; x < 3", "x"))
+        assert result["status"] == "unsat"
+
+    def test_z3_three_variables(self):
+        result = json.loads(math_solve("z3", "x + y + z == 6; x == 1; y == 2", "x,y,z"))
+        assert result["status"] == "sat"
+        assert result["solution"]["x"] == "1"
+        assert result["solution"]["y"] == "2"
+        assert result["solution"]["z"] == "3"
+
+    def test_z3_invalid_constraint(self):
+        result = json.loads(math_solve("z3", "not valid python", "x"))
+        assert "error" in result
+
+    def test_z3_returns_valid_json(self):
+        raw = math_solve("z3", "x == 5", "x")
+        parsed = json.loads(raw)
+        assert "status" in parsed or "error" in parsed
+
+
+class TestMathSolveUnknownMode:
+    def test_unknown_mode(self):
+        result = json.loads(math_solve("unknown", "1+1"))
+        assert "error" in result

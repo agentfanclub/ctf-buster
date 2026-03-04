@@ -694,4 +694,751 @@ mod tests {
     assert_eq!(challenges[0].hints.len(), 1);
     assert_eq!(challenges[0].tags, vec!["easy"]);
   }
+
+  // ── Orchestration state tests ──────────────────────────────────────────────
+
+  #[test]
+  fn load_orchestration_empty_by_default() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+    let orch = load_orchestration(dir.path()).unwrap();
+    assert!(orch.queue.is_empty());
+    assert!(orch.in_progress.is_empty());
+    assert!(orch.failed.is_empty());
+    assert!(orch.updated_at.is_none());
+  }
+
+  #[test]
+  fn update_orchestration_persists_queue() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let orch = OrchestrationState {
+      queue: vec![
+        QueuedChallenge { name: "Easy RSA".into(), category: "crypto".into(), priority: 30, points: 100 },
+        QueuedChallenge { name: "SQLi".into(), category: "web".into(), priority: 28, points: 200 },
+      ],
+      in_progress: vec![],
+      failed: vec![],
+      updated_at: Some(Utc::now()),
+    };
+    update_orchestration(dir.path(), orch).unwrap();
+
+    let loaded = load_orchestration(dir.path()).unwrap();
+    assert_eq!(loaded.queue.len(), 2);
+    assert_eq!(loaded.queue[0].name, "Easy RSA");
+    assert_eq!(loaded.queue[0].priority, 30);
+    assert_eq!(loaded.queue[1].name, "SQLi");
+    assert!(loaded.updated_at.is_some());
+  }
+
+  #[test]
+  fn update_orchestration_persists_in_progress() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let orch = OrchestrationState {
+      queue: vec![],
+      in_progress: vec!["Challenge A".into(), "Challenge B".into()],
+      failed: vec![],
+      updated_at: Some(Utc::now()),
+    };
+    update_orchestration(dir.path(), orch).unwrap();
+
+    let loaded = load_orchestration(dir.path()).unwrap();
+    assert_eq!(loaded.in_progress, vec!["Challenge A", "Challenge B"]);
+  }
+
+  #[test]
+  fn update_orchestration_persists_failed() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let now = Utc::now();
+    let orch = OrchestrationState {
+      queue: vec![],
+      in_progress: vec![],
+      failed: vec![FailedAttempt {
+        name: "Hard Pwn".into(),
+        category: "pwn".into(),
+        attempted_at: now,
+        notes: "Could not find overflow offset".into(),
+      }],
+      updated_at: Some(now),
+    };
+    update_orchestration(dir.path(), orch).unwrap();
+
+    let loaded = load_orchestration(dir.path()).unwrap();
+    assert_eq!(loaded.failed.len(), 1);
+    assert_eq!(loaded.failed[0].name, "Hard Pwn");
+    assert_eq!(loaded.failed[0].notes, "Could not find overflow offset");
+  }
+
+  #[test]
+  fn update_orchestration_replaces_previous() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    // Set initial queue
+    let orch1 = OrchestrationState {
+      queue: vec![
+        QueuedChallenge { name: "A".into(), category: "web".into(), priority: 10, points: 100 },
+      ],
+      in_progress: vec![],
+      failed: vec![],
+      updated_at: Some(Utc::now()),
+    };
+    update_orchestration(dir.path(), orch1).unwrap();
+
+    // Replace with different queue
+    let orch2 = OrchestrationState {
+      queue: vec![
+        QueuedChallenge { name: "B".into(), category: "crypto".into(), priority: 20, points: 200 },
+        QueuedChallenge { name: "C".into(), category: "rev".into(), priority: 15, points: 150 },
+      ],
+      in_progress: vec!["A".into()],
+      failed: vec![],
+      updated_at: Some(Utc::now()),
+    };
+    update_orchestration(dir.path(), orch2).unwrap();
+
+    let loaded = load_orchestration(dir.path()).unwrap();
+    assert_eq!(loaded.queue.len(), 2);
+    assert_eq!(loaded.queue[0].name, "B");
+    assert_eq!(loaded.queue[1].name, "C");
+    assert_eq!(loaded.in_progress, vec!["A"]);
+  }
+
+  #[test]
+  fn orchestration_does_not_clobber_challenges() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    // Sync some challenges first
+    let challenges = vec![make_challenge("1", "Test", "web")];
+    update_sync(dir.path(), &challenges).unwrap();
+
+    // Update orchestration
+    let orch = OrchestrationState {
+      queue: vec![
+        QueuedChallenge { name: "Test".into(), category: "web".into(), priority: 10, points: 100 },
+      ],
+      in_progress: vec![],
+      failed: vec![],
+      updated_at: Some(Utc::now()),
+    };
+    update_orchestration(dir.path(), orch).unwrap();
+
+    // Verify challenges are still there
+    let state = load_state(dir.path()).unwrap();
+    assert_eq!(state.challenges.len(), 1);
+    assert_eq!(state.challenges["test"].name, "Test");
+    assert_eq!(state.orchestration.queue.len(), 1);
+  }
+
+  #[test]
+  fn save_writeup_stores_methodology_and_tools() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    // First create a challenge entry
+    mark_solved(dir.path(), "1", "Easy RSA", 100, "flag{rsa}").unwrap();
+
+    // Save writeup
+    save_writeup(
+      dir.path(),
+      "Easy RSA",
+      "Factored n using factordb, computed d, decrypted",
+      &["crypto_rsa_toolkit".into(), "python".into()],
+    )
+    .unwrap();
+
+    let state = load_state(dir.path()).unwrap();
+    let entry = &state.challenges["easy rsa"];
+    assert_eq!(
+      entry.methodology.as_deref(),
+      Some("Factored n using factordb, computed d, decrypted")
+    );
+    assert_eq!(
+      entry.tools_used.as_ref().unwrap(),
+      &["crypto_rsa_toolkit", "python"]
+    );
+  }
+
+  #[test]
+  fn save_writeup_noop_for_missing_challenge() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    // Saving writeup for nonexistent challenge should not error
+    let result = save_writeup(dir.path(), "nonexistent", "method", &["tool".into()]);
+    assert!(result.is_ok());
+
+    // But nothing should be stored
+    let state = load_state(dir.path()).unwrap();
+    assert!(state.challenges.is_empty());
+  }
+
+  #[test]
+  fn save_writeup_overwrites_previous() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+    mark_solved(dir.path(), "1", "Test", 100, "flag{x}").unwrap();
+
+    save_writeup(dir.path(), "Test", "first attempt", &["tool1".into()]).unwrap();
+    save_writeup(dir.path(), "Test", "better method", &["tool1".into(), "tool2".into()]).unwrap();
+
+    let state = load_state(dir.path()).unwrap();
+    let entry = &state.challenges["test"];
+    assert_eq!(entry.methodology.as_deref(), Some("better method"));
+    assert_eq!(entry.tools_used.as_ref().unwrap().len(), 2);
+  }
+
+  // ── Queue operation simulation tests ───────────────────────────────────────
+  // These test the queue state machine operations that ctf_queue_update performs
+
+  #[test]
+  fn queue_start_action_moves_to_in_progress() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let mut orch = OrchestrationState {
+      queue: vec![
+        QueuedChallenge { name: "A".into(), category: "crypto".into(), priority: 30, points: 100 },
+        QueuedChallenge { name: "B".into(), category: "web".into(), priority: 20, points: 200 },
+      ],
+      in_progress: vec![],
+      failed: vec![],
+      updated_at: None,
+    };
+
+    // Simulate "start" action for challenge A
+    let name = "A".to_string();
+    orch.queue.retain(|q| q.name != name);
+    if !orch.in_progress.contains(&name) {
+      orch.in_progress.push(name);
+    }
+    orch.updated_at = Some(Utc::now());
+    update_orchestration(dir.path(), orch).unwrap();
+
+    let loaded = load_orchestration(dir.path()).unwrap();
+    assert_eq!(loaded.queue.len(), 1);
+    assert_eq!(loaded.queue[0].name, "B");
+    assert_eq!(loaded.in_progress, vec!["A"]);
+  }
+
+  #[test]
+  fn queue_complete_action_removes_from_in_progress() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let mut orch = OrchestrationState {
+      queue: vec![],
+      in_progress: vec!["A".into(), "B".into()],
+      failed: vec![],
+      updated_at: None,
+    };
+
+    // Simulate "complete" action for A
+    let name = "A";
+    orch.in_progress.retain(|n| n != name);
+    orch.updated_at = Some(Utc::now());
+    update_orchestration(dir.path(), orch).unwrap();
+
+    let loaded = load_orchestration(dir.path()).unwrap();
+    assert!(loaded.in_progress == vec!["B"]);
+  }
+
+  #[test]
+  fn queue_fail_action_moves_to_failed() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let mut orch = OrchestrationState {
+      queue: vec![],
+      in_progress: vec!["Hard Challenge".into()],
+      failed: vec![],
+      updated_at: None,
+    };
+
+    // Simulate "fail" action
+    let name = "Hard Challenge".to_string();
+    orch.in_progress.retain(|n| n != &name);
+    orch.failed.push(FailedAttempt {
+      name,
+      category: "pwn".into(),
+      attempted_at: Utc::now(),
+      notes: "buffer overflow offset unknown".into(),
+    });
+    orch.updated_at = Some(Utc::now());
+    update_orchestration(dir.path(), orch).unwrap();
+
+    let loaded = load_orchestration(dir.path()).unwrap();
+    assert!(loaded.in_progress.is_empty());
+    assert_eq!(loaded.failed.len(), 1);
+    assert_eq!(loaded.failed[0].name, "Hard Challenge");
+  }
+
+  #[test]
+  fn queue_retry_action_moves_failed_to_queue() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let mut orch = OrchestrationState {
+      queue: vec![
+        QueuedChallenge { name: "Other".into(), category: "web".into(), priority: 10, points: 100 },
+      ],
+      in_progress: vec![],
+      failed: vec![FailedAttempt {
+        name: "Hard Pwn".into(),
+        category: "pwn".into(),
+        attempted_at: Utc::now(),
+        notes: "failed first attempt".into(),
+      }],
+      updated_at: None,
+    };
+
+    // Simulate "retry" action
+    let name_lower = "hard pwn".to_lowercase();
+    if let Some(pos) = orch.failed.iter().position(|f| f.name.to_lowercase() == name_lower) {
+      let failed = orch.failed.remove(pos);
+      orch.queue.push(QueuedChallenge {
+        name: failed.name,
+        category: failed.category,
+        priority: -5,
+        points: 0,
+      });
+    }
+    orch.updated_at = Some(Utc::now());
+    update_orchestration(dir.path(), orch).unwrap();
+
+    let loaded = load_orchestration(dir.path()).unwrap();
+    assert!(loaded.failed.is_empty());
+    assert_eq!(loaded.queue.len(), 2);
+    assert_eq!(loaded.queue[1].name, "Hard Pwn");
+    assert_eq!(loaded.queue[1].priority, -5);
+  }
+
+  #[test]
+  fn queue_prioritize_action_moves_to_front() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let mut orch = OrchestrationState {
+      queue: vec![
+        QueuedChallenge { name: "A".into(), category: "crypto".into(), priority: 30, points: 100 },
+        QueuedChallenge { name: "B".into(), category: "web".into(), priority: 20, points: 200 },
+        QueuedChallenge { name: "C".into(), category: "rev".into(), priority: 10, points: 150 },
+      ],
+      in_progress: vec![],
+      failed: vec![],
+      updated_at: None,
+    };
+
+    // Simulate "prioritize" action for C
+    let name_lower = "c".to_lowercase();
+    if let Some(pos) = orch.queue.iter().position(|q| q.name.to_lowercase() == name_lower) {
+      let mut entry = orch.queue.remove(pos);
+      let max_priority = orch.queue.iter().map(|q| q.priority).max().unwrap_or(0);
+      entry.priority = max_priority + 100;
+      orch.queue.insert(0, entry);
+    }
+    orch.updated_at = Some(Utc::now());
+    update_orchestration(dir.path(), orch).unwrap();
+
+    let loaded = load_orchestration(dir.path()).unwrap();
+    assert_eq!(loaded.queue.len(), 3);
+    assert_eq!(loaded.queue[0].name, "C");
+    assert_eq!(loaded.queue[0].priority, 130); // 30 + 100
+  }
+
+  #[test]
+  fn queue_prioritize_rescues_from_failed() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let mut orch = OrchestrationState {
+      queue: vec![
+        QueuedChallenge { name: "A".into(), category: "crypto".into(), priority: 20, points: 100 },
+      ],
+      in_progress: vec![],
+      failed: vec![FailedAttempt {
+        name: "Failed One".into(),
+        category: "web".into(),
+        attempted_at: Utc::now(),
+        notes: "timeout".into(),
+      }],
+      updated_at: None,
+    };
+
+    // Simulate "prioritize" for a failed challenge
+    let name_lower = "failed one".to_lowercase();
+    let found_in_queue = orch.queue.iter().position(|q| q.name.to_lowercase() == name_lower);
+    assert!(found_in_queue.is_none());
+
+    if let Some(failed_pos) = orch.failed.iter().position(|f| f.name.to_lowercase() == name_lower) {
+      let failed = orch.failed.remove(failed_pos);
+      let max_priority = orch.queue.iter().map(|q| q.priority).max().unwrap_or(0);
+      orch.queue.insert(0, QueuedChallenge {
+        name: failed.name,
+        category: failed.category,
+        priority: max_priority + 100,
+        points: 0,
+      });
+    }
+    orch.updated_at = Some(Utc::now());
+    update_orchestration(dir.path(), orch).unwrap();
+
+    let loaded = load_orchestration(dir.path()).unwrap();
+    assert!(loaded.failed.is_empty());
+    assert_eq!(loaded.queue.len(), 2);
+    assert_eq!(loaded.queue[0].name, "Failed One");
+    assert_eq!(loaded.queue[0].priority, 120); // 20 + 100
+  }
+
+  #[test]
+  fn queue_clear_resets_everything() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let orch = OrchestrationState {
+      queue: vec![
+        QueuedChallenge { name: "A".into(), category: "crypto".into(), priority: 30, points: 100 },
+      ],
+      in_progress: vec!["B".into()],
+      failed: vec![FailedAttempt {
+        name: "C".into(),
+        category: "pwn".into(),
+        attempted_at: Utc::now(),
+        notes: "failed".into(),
+      }],
+      updated_at: Some(Utc::now()),
+    };
+    update_orchestration(dir.path(), orch).unwrap();
+
+    // Simulate "clear" action
+    update_orchestration(dir.path(), OrchestrationState::default()).unwrap();
+
+    let loaded = load_orchestration(dir.path()).unwrap();
+    assert!(loaded.queue.is_empty());
+    assert!(loaded.in_progress.is_empty());
+    assert!(loaded.failed.is_empty());
+  }
+
+  // ── Auto-queue scoring algorithm tests ─────────────────────────────────────
+  // These test the scoring logic from ctf_auto_queue by reproducing it directly
+
+  fn score_challenge(challenge: &Challenge, failed_names: &std::collections::HashSet<String>) -> i32 {
+    let cat = challenge.category.to_lowercase();
+    let category_score: i32 = match cat.as_str() {
+      "crypto" | "cryptography" => 10,
+      "forensics" | "forensic" => 10,
+      "web" | "web exploitation" => 8,
+      "rev" | "reverse" | "reverse engineering" | "reversing" => 6,
+      "misc" | "miscellaneous" | "trivia" => 4,
+      "pwn" | "binary exploitation" | "exploitation" | "pwnable" => 2,
+      _ => 4,
+    };
+
+    let difficulty_bonus: i32 = if challenge.solves > 50 {
+      20
+    } else if challenge.solves >= 20 {
+      10
+    } else {
+      0
+    };
+
+    let solve_bonus: i32 = if challenge.solves > 0 && (challenge.value as f64 / challenge.solves as f64) < 10.0 {
+      5
+    } else {
+      0
+    };
+
+    let mut priority = category_score + difficulty_bonus + solve_bonus;
+
+    if failed_names.contains(&challenge.name.to_lowercase()) {
+      priority -= 10;
+    }
+
+    priority
+  }
+
+  #[test]
+  fn scoring_crypto_high_solves() {
+    let empty = std::collections::HashSet::new();
+    let c = Challenge {
+      id: "1".into(), name: "Easy RSA".into(), category: "crypto".into(),
+      description: String::new(), value: 100, solves: 60, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    // crypto=10 + difficulty(>50)=20 + solve_bonus(100/60<10)=5 = 35
+    assert_eq!(score_challenge(&c, &empty), 35);
+  }
+
+  #[test]
+  fn scoring_pwn_low_solves() {
+    let empty = std::collections::HashSet::new();
+    let c = Challenge {
+      id: "2".into(), name: "Hard Exploit".into(), category: "pwn".into(),
+      description: String::new(), value: 500, solves: 5, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    // pwn=2 + difficulty(<20)=0 + solve_bonus(500/5=100, not<10)=0 = 2
+    assert_eq!(score_challenge(&c, &empty), 2);
+  }
+
+  #[test]
+  fn scoring_web_medium_solves() {
+    let empty = std::collections::HashSet::new();
+    let c = Challenge {
+      id: "3".into(), name: "SQLi Basic".into(), category: "web".into(),
+      description: String::new(), value: 100, solves: 35, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    // web=8 + difficulty(20-50)=10 + solve_bonus(100/35≈2.8<10)=5 = 23
+    assert_eq!(score_challenge(&c, &empty), 23);
+  }
+
+  #[test]
+  fn scoring_failed_challenge_penalized() {
+    let mut failed = std::collections::HashSet::new();
+    failed.insert("hard rev".to_string());
+
+    let c = Challenge {
+      id: "4".into(), name: "Hard Rev".into(), category: "rev".into(),
+      description: String::new(), value: 400, solves: 25, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    // rev=6 + difficulty(20-50)=10 + solve_bonus(400/25=16, not<10)=0 - failed=10 = 6
+    assert_eq!(score_challenge(&c, &failed), 6);
+  }
+
+  #[test]
+  fn scoring_unknown_category_defaults_to_misc() {
+    let empty = std::collections::HashSet::new();
+    let c = Challenge {
+      id: "5".into(), name: "Random".into(), category: "osint".into(),
+      description: String::new(), value: 50, solves: 100, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    // unknown(osint)=4 + difficulty(>50)=20 + solve_bonus(50/100=0.5<10)=5 = 29
+    assert_eq!(score_challenge(&c, &empty), 29);
+  }
+
+  #[test]
+  fn scoring_forensics_matches_crypto_priority() {
+    let empty = std::collections::HashSet::new();
+    let crypto = Challenge {
+      id: "1".into(), name: "A".into(), category: "crypto".into(),
+      description: String::new(), value: 100, solves: 10, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    let forensics = Challenge {
+      id: "2".into(), name: "B".into(), category: "forensics".into(),
+      description: String::new(), value: 100, solves: 10, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    assert_eq!(score_challenge(&crypto, &empty), score_challenge(&forensics, &empty));
+  }
+
+  #[test]
+  fn scoring_category_aliases() {
+    let empty = std::collections::HashSet::new();
+    let make = |cat: &str| Challenge {
+      id: "1".into(), name: "T".into(), category: cat.into(),
+      description: String::new(), value: 100, solves: 10, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    // All pwn aliases should score the same
+    assert_eq!(score_challenge(&make("pwn"), &empty), score_challenge(&make("binary exploitation"), &empty));
+    assert_eq!(score_challenge(&make("pwn"), &empty), score_challenge(&make("exploitation"), &empty));
+    assert_eq!(score_challenge(&make("pwn"), &empty), score_challenge(&make("pwnable"), &empty));
+
+    // All rev aliases
+    assert_eq!(score_challenge(&make("rev"), &empty), score_challenge(&make("reverse engineering"), &empty));
+    assert_eq!(score_challenge(&make("rev"), &empty), score_challenge(&make("reversing"), &empty));
+
+    // All misc aliases
+    assert_eq!(score_challenge(&make("misc"), &empty), score_challenge(&make("miscellaneous"), &empty));
+    assert_eq!(score_challenge(&make("misc"), &empty), score_challenge(&make("trivia"), &empty));
+  }
+
+  #[test]
+  fn scoring_difficulty_bonus_boundary_at_20() {
+    let empty = std::collections::HashSet::new();
+    let make = |solves: u32| Challenge {
+      id: "1".into(), name: "T".into(), category: "misc".into(),
+      description: String::new(), value: 200, solves, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    // 19 solves → 0 bonus, 20 solves → 10 bonus
+    let score_19 = score_challenge(&make(19), &empty);
+    let score_20 = score_challenge(&make(20), &empty);
+    assert_eq!(score_20 - score_19, 10);
+  }
+
+  #[test]
+  fn scoring_difficulty_bonus_boundary_at_51() {
+    let empty = std::collections::HashSet::new();
+    let make = |solves: u32| Challenge {
+      id: "1".into(), name: "T".into(), category: "misc".into(),
+      description: String::new(), value: 1000, solves, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    // 50 solves → 10 bonus, 51 solves → 20 bonus
+    let score_50 = score_challenge(&make(50), &empty);
+    let score_51 = score_challenge(&make(51), &empty);
+    assert_eq!(score_51 - score_50, 10);
+  }
+
+  #[test]
+  fn scoring_solve_bonus_boundary() {
+    let empty = std::collections::HashSet::new();
+    // value/solves < 10 → bonus 5
+    let with_bonus = Challenge {
+      id: "1".into(), name: "T".into(), category: "misc".into(),
+      description: String::new(), value: 90, solves: 10, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    // value/solves = 10 → no bonus
+    let without_bonus = Challenge {
+      id: "1".into(), name: "T".into(), category: "misc".into(),
+      description: String::new(), value: 100, solves: 10, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    assert_eq!(score_challenge(&with_bonus, &empty) - score_challenge(&without_bonus, &empty), 5);
+  }
+
+  #[test]
+  fn scoring_zero_solves_no_bonus() {
+    let empty = std::collections::HashSet::new();
+    let c = Challenge {
+      id: "1".into(), name: "T".into(), category: "misc".into(),
+      description: String::new(), value: 0, solves: 0, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    };
+    // misc=4 + difficulty(0<20)=0 + solve_bonus(0 solves → no bonus)=0 = 4
+    assert_eq!(score_challenge(&c, &empty), 4);
+  }
+
+  // ── Queued challenge / failed attempt serialization tests ──────────────────
+
+  #[test]
+  fn queued_challenge_roundtrip() {
+    let qc = QueuedChallenge {
+      name: "Easy RSA".into(),
+      category: "crypto".into(),
+      priority: 35,
+      points: 100,
+    };
+    let json = serde_json::to_string(&qc).unwrap();
+    let deserialized: QueuedChallenge = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, qc);
+  }
+
+  #[test]
+  fn failed_attempt_roundtrip() {
+    let fa = FailedAttempt {
+      name: "Hard Pwn".into(),
+      category: "pwn".into(),
+      attempted_at: Utc::now(),
+      notes: "Could not find offset".into(),
+    };
+    let json = serde_json::to_string(&fa).unwrap();
+    let deserialized: FailedAttempt = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, fa);
+  }
+
+  #[test]
+  fn orchestration_state_roundtrip() {
+    let orch = OrchestrationState {
+      queue: vec![
+        QueuedChallenge { name: "A".into(), category: "crypto".into(), priority: 30, points: 100 },
+      ],
+      in_progress: vec!["B".into()],
+      failed: vec![FailedAttempt {
+        name: "C".into(),
+        category: "pwn".into(),
+        attempted_at: Utc::now(),
+        notes: "failed".into(),
+      }],
+      updated_at: Some(Utc::now()),
+    };
+    let json = serde_json::to_string(&orch).unwrap();
+    let deserialized: OrchestrationState = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.queue, orch.queue);
+    assert_eq!(deserialized.in_progress, orch.in_progress);
+    assert_eq!(deserialized.failed, orch.failed);
+  }
+
+  // ── Writeup generation tests ──────────────────────────────────────────────
+
+  #[test]
+  fn save_writeup_preserves_existing_solved_fields() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+    mark_solved(dir.path(), "1", "Test", 200, "flag{test}").unwrap();
+
+    save_writeup(dir.path(), "Test", "used crypto tools", &["crypto_identify".into()]).unwrap();
+
+    let state = load_state(dir.path()).unwrap();
+    let entry = &state.challenges["test"];
+    // Solved fields should still be there
+    assert_eq!(entry.status, ChallengeStatus::Solved);
+    assert_eq!(entry.flag.as_deref(), Some("flag{test}"));
+    assert_eq!(entry.points, Some(200));
+    // And writeup fields too
+    assert_eq!(entry.methodology.as_deref(), Some("used crypto tools"));
+  }
+
+  #[test]
+  fn merge_does_not_overwrite_existing_description() {
+    let mut state = WorkspaceState::default();
+    state.challenges.insert(
+      "test".into(),
+      ChallengeState {
+        id: "1".into(), name: "test".into(), category: "web".into(),
+        status: ChallengeStatus::Unsolved, solved_at: None, points: None, flag: None,
+        description: Some("Old description".into()),
+        hints: None, files: None, tags: None, details_fetched_at: None,
+        methodology: None, tools_used: None,
+      },
+    );
+
+    let mut challenges = vec![Challenge {
+      id: "1".into(), name: "test".into(), category: "web".into(),
+      description: "Platform description".into(),
+      value: 100, solves: 5, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    }];
+
+    merge_cached_details(&mut challenges, &state);
+    // Platform already has a description, so cached one should NOT override
+    assert_eq!(challenges[0].description, "Platform description");
+  }
+
+  #[test]
+  fn merge_fills_empty_description_from_cache() {
+    let mut state = WorkspaceState::default();
+    state.challenges.insert(
+      "test".into(),
+      ChallengeState {
+        id: "1".into(), name: "test".into(), category: "web".into(),
+        status: ChallengeStatus::Unsolved, solved_at: None, points: None, flag: None,
+        description: Some("Cached description".into()),
+        hints: None, files: None, tags: None, details_fetched_at: None,
+        methodology: None, tools_used: None,
+      },
+    );
+
+    let mut challenges = vec![Challenge {
+      id: "1".into(), name: "test".into(), category: "web".into(),
+      description: String::new(), // empty
+      value: 100, solves: 5, solved_by_me: false,
+      files: vec![], tags: vec![], hints: vec![],
+    }];
+
+    merge_cached_details(&mut challenges, &state);
+    assert_eq!(challenges[0].description, "Cached description");
+  }
 }
