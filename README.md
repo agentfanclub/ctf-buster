@@ -12,7 +12,7 @@ workspace.
   track scores on CTFd and rCTF with automatic platform detection.
 - **Workspace management** -- initialize per-competition workspaces with
   scaffolded directories, solve templates, and notes files.
-- **6 MCP servers / 44 tools** -- expose every capability over MCP so AI agents
+- **6 MCP servers / 50 tools** -- expose every capability over MCP so AI agents
   can call them directly.
 - **TUI dashboard** -- run `ctf dashboard` in a separate terminal to monitor
   progress in real-time while the AI orchestrator works.
@@ -74,7 +74,7 @@ ctf submit "challenge-name" "flag{...}"
 |----------|-------------|
 | [Architecture](docs/architecture.md) | System design, module structure, platform abstraction |
 | [CLI Reference](docs/cli-reference.md) | All CLI commands with examples |
-| [MCP Tools](docs/mcp-tools.md) | All 44 tools across 6 MCP servers |
+| [MCP Tools](docs/mcp-tools.md) | All 50 tools across 6 MCP servers |
 | [Configuration](docs/configuration.md) | `.ctf.toml`, authentication, scaffold templates |
 | [Integration](docs/integration.md) | Claude Code setup and `.mcp.json` |
 | [Security Tools](docs/security-tools.md) | 160+ tools available in the Nix dev shell |

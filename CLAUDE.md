@@ -1,14 +1,14 @@
 # CTF-Buster
 
-AI-powered CTF competition toolkit. Rust CLI + 6 MCP servers (44 tools total).
+AI-powered CTF competition toolkit. Rust CLI + 6 MCP servers (50 tools total).
 
 ## Architecture
 
 ```
 ctf-buster (Rust)      — 14 tools: platform interaction (CTFd/rCTF), queue management, auto-orchestration, writeups
-ctf-crypto (Python)    — 6 tools: encoding chains, RSA attacks, constraint solving
-ctf-pwn (Python)       — 8 tools: triage, disassembly, ROP, pwntools, angr
-ctf-forensics (Python) — 5 tools: file analysis, stego, extraction, entropy
+ctf-crypto (Python)    — 8 tools: encoding chains, RSA attacks, constraint solving, XOR analysis, SageMath
+ctf-pwn (Python)       — 11 tools: triage, disassembly, ROP, pwntools, angr, format strings, libc lookup
+ctf-forensics (Python) — 6 tools: file analysis, stego, extraction, entropy, volatility
 ctf-gdb (Python)       — 5 tools: GDB dynamic analysis, breakpoints, input tracing
 ctf-rev (Python)       — 6 tools: decompilation, xrefs, CFG, function analysis
 ```
@@ -185,6 +185,8 @@ For parallel execution, launch multiple subagents in a single message using the 
 - `crypto_rsa_toolkit` for RSA challenges (auto-tries factordb, fermat, wiener, small-e)
 - `crypto_math_solve` with z3 mode for constraint problems
 - `crypto_frequency_analysis` for classical ciphers
+- `crypto_xor_analyze` for XOR/stream cipher challenges (known-plaintext, Kasiski, IC, brute force)
+- `crypto_sage_solve` to run SageMath scripts for finite field, lattice, and DLP problems
 
 **Binary/Pwn challenges:** (solve.py has a pwntools skeleton with ELF/remote setup — fill in the exploit)
 - `pwn_triage` first — get checksec, imports, dangerous functions, architecture
@@ -207,6 +209,9 @@ For parallel execution, launch multiple subagents in a single message using the 
 - `pwn_pattern_offset` to find buffer overflow offsets
 - `pwn_pwntools_template` to generate exploit scripts
 - `pwn_shellcode_generate` for shellcode payloads
+- `pwn_format_string` for format string exploit automation (probe for offset, generate write payloads)
+- `pwn_one_gadget` to find single-instruction RCE gadgets in libc
+- `pwn_libc_lookup` to identify libc version from leaked symbol addresses (libc.rip API)
 
 **Reverse engineering challenges:** (solve.py has subprocess/struct imports — add decoder/keygen logic)
 - `rev_functions` to get an overview of all functions
@@ -223,6 +228,7 @@ For parallel execution, launch multiple subagents in a single message using the 
 - `forensics_extract_embedded` for binwalk/foremost extraction
 - `forensics_entropy_analysis` to find encrypted/compressed regions
 - `forensics_image_analysis` for deep image inspection (LSB, channels, histograms)
+- `forensics_volatility` for memory dump analysis (.raw, .vmem, .dmp) — runs volatility3 plugins
 
 **Web challenges:** (solve.py has a requests session template — build your exploit there)
 - Use bash directly: curl, sqlmap, ffuf, nuclei, nikto, etc.
@@ -293,9 +299,9 @@ orchestrator works. The dashboard polls `.ctf-state.json` every 2 seconds and sh
 ```bash
 nix develop                                    # Enter devShell
 cargo build --release                          # Build Rust CLI
-cargo test                                     # Run Rust tests (94 tests)
+cargo test                                     # Run Rust tests (137 tests)
 cargo clippy -- -W clippy::all                 # Lint Rust
-python3 -m pytest tools/tests/                 # Run Python tests (309 tests)
+python3 -m pytest tools/tests/                 # Run Python tests (378 tests)
 python3 -m pytest tools/tests/ --cov=tools     # Python coverage
 cargo tarpaulin                                # Rust coverage
 ```

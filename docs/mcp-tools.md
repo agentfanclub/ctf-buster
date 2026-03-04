@@ -1,6 +1,6 @@
 # MCP Tools Reference
 
-CTF-Buster provides 44 tools across 6 MCP servers.
+CTF-Buster provides 50 tools across 6 MCP servers.
 
 ## ctf-buster (Rust) -- 14 tools
 
@@ -24,7 +24,7 @@ Platform interaction, workspace management, auto-orchestration, and documentatio
 | `ctf_generate_solve_prompt` | Generate ready-to-use subagent prompts for solving challenges. Returns JSON with challenge info, recommended model, tool suggestions, and full prompt text for the Task tool. |
 | `ctf_save_writeup` | Save a writeup for a solved challenge -- records methodology and tools used, generates `writeup.md` in the challenge directory. Call after submitting a flag. |
 
-## ctf-crypto (Python) -- 6 tools
+## ctf-crypto (Python) -- 8 tools
 
 Encoding pipelines, cryptographic attacks, and mathematical solving.
 
@@ -36,8 +36,10 @@ Encoding pipelines, cryptographic attacks, and mathematical solving.
 | `crypto_math_solve` | Evaluate sympy expressions (`mode="eval"`) or solve Z3 constraints (`mode="z3"` with semicolon-separated constraints). |
 | `crypto_hash_crack` | Identify hash type and attempt lightweight dictionary cracking. Supports MD5, SHA-1, SHA-256, SHA-512, bcrypt, crypt variants. |
 | `crypto_frequency_analysis` | Character and bigram frequency analysis, chi-squared English scoring, and index of coincidence for classical cipher analysis. |
+| `crypto_xor_analyze` | XOR key recovery and analysis -- known-plaintext attack, Kasiski examination, Index of Coincidence key length estimation, single-byte brute force, multi-byte key recovery. |
+| `crypto_sage_solve` | Execute SageMath scripts for finite field math, lattice reduction, discrete log, and polynomial solving. Returns stdout/stderr with optional JSON parsing. |
 
-## ctf-pwn (Python) -- 8 tools
+## ctf-pwn (Python) -- 11 tools
 
 Binary analysis and exploit development.
 
@@ -50,8 +52,11 @@ Binary analysis and exploit development.
 | `pwn_shellcode_generate` | Generate shellcode via pwntools shellcraft (sh, cat_flag, connect_back, execve) for amd64/i386/arm/aarch64/mips. |
 | `pwn_pwntools_template` | Generate a complete pwntools exploit script skeleton (ret2win, ret2libc, format_string, shellcode) from binary analysis. |
 | `pwn_angr_analyze` | Symbolic execution via angr -- auto mode finds flag-like output, find_addr reaches specific addresses, find_string matches output. |
+| `pwn_one_gadget` | Find single-instruction RCE gadgets in libc using one_gadget. Returns gadget addresses and their constraints. |
+| `pwn_libc_lookup` | Identify libc version from leaked symbol addresses via libc.rip API. Computes base address and key offsets (system, /bin/sh, hooks). |
+| `pwn_format_string` | Format string exploit automation -- probe for stack offset (`find_offset`), generate arbitrary write payloads (`write`), or get a reference guide (`info`). |
 
-## ctf-forensics (Python) -- 5 tools
+## ctf-forensics (Python) -- 6 tools
 
 File forensics and steganography.
 
@@ -62,6 +67,7 @@ File forensics and steganography.
 | `forensics_extract_embedded` | Extract embedded files using binwalk and foremost. Returns extracted file types, sizes, and content previews. |
 | `forensics_entropy_analysis` | Block-level Shannon entropy calculation to detect encrypted/compressed regions and anomalous boundaries. |
 | `forensics_image_analysis` | Deep image inspection -- channel statistics, LSB ratio analysis, palette examination, histogram anomaly detection. Optional LSB data extraction. |
+| `forensics_volatility` | Memory dump analysis using volatility3. Runs plugins (pslist, filescan, hashdump, netscan, etc.) on .raw/.vmem/.dmp files. Tries JSON renderer with text fallback. |
 
 ## ctf-gdb (Python) -- 5 tools
 
