@@ -21,8 +21,6 @@ def _unwrap(tool):
 # Access the underlying functions from FastMCP tool wrappers
 pwn_triage = _unwrap(ctf_pwn.pwn_triage)
 _pwn_triage_impl = ctf_pwn._pwn_triage_impl
-disassemble = _unwrap(ctf_pwn.pwn_disassemble)
-find_rop_gadgets = _unwrap(ctf_pwn.pwn_rop_gadgets)
 pattern_offset = _unwrap(ctf_pwn.pwn_pattern_offset)
 shellcode_generate = _unwrap(ctf_pwn.pwn_shellcode_generate)
 pwntools_template = _unwrap(ctf_pwn.pwn_pwntools_template)
@@ -107,79 +105,6 @@ class TestBinaryTriage:
             os.unlink(real_path)
             if os.path.exists(link_path):
                 os.unlink(link_path)
-
-
-# ── disassemble tests ────────────────────────────────────────────────────────
-
-
-class TestDisassemble:
-    def test_nonexistent_file(self):
-        result = json.loads(disassemble("/nonexistent/binary/xyz"))
-        assert "error" in result
-        assert "not found" in result["error"].lower()
-
-    def test_returns_function_field(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            result = json.loads(disassemble(path, function="main"))
-            assert result["function"] == "main"
-        finally:
-            os.unlink(path)
-
-    def test_custom_function_name(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            result = json.loads(disassemble(path, function="vuln"))
-            assert result["function"] == "vuln"
-        finally:
-            os.unlink(path)
-
-    def test_hex_address(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            result = json.loads(disassemble(path, function="0x401000"))
-            assert result["function"] == "0x401000"
-        finally:
-            os.unlink(path)
-
-    def test_returns_valid_json(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"not a real binary")
-            path = f.name
-        try:
-            raw = disassemble(path)
-            parsed = json.loads(raw)
-            assert "function" in parsed
-            assert "disassembly" in parsed
-        finally:
-            os.unlink(path)
-
-
-# ── find_rop_gadgets tests ───────────────────────────────────────────────────
-
-
-class TestFindRopGadgets:
-    def test_nonexistent_file(self):
-        result = json.loads(find_rop_gadgets("/nonexistent/binary/xyz"))
-        assert "error" in result
-
-    def test_returns_valid_json(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            raw = find_rop_gadgets(path)
-            parsed = json.loads(raw)
-            # Either has gadgets or an error (ROPgadget might not parse the minimal ELF)
-            assert "gadgets" in parsed or "error" in parsed
-        finally:
-            os.unlink(path)
 
 
 # ── pattern_offset tests ─────────────────────────────────────────────────────
@@ -413,10 +338,6 @@ class TestJsonOutput:
         raw = pwn_triage("/dev/null")
         json.loads(raw)
 
-    def test_disassemble_json(self):
-        raw = disassemble("/dev/null")
-        json.loads(raw)
-
     def test_pattern_offset_create_json(self):
         raw = pattern_offset(action="create", length=10)
         json.loads(raw)
@@ -428,57 +349,6 @@ class TestJsonOutput:
     def test_shellcode_generate_json(self):
         raw = shellcode_generate()
         json.loads(raw)
-
-
-# ── pwn_one_gadget tests ────────────────────────────────────────────────────
-
-one_gadget = _unwrap(ctf_pwn.pwn_one_gadget)
-
-
-class TestOneGadget:
-    def test_nonexistent_file(self):
-        result = json.loads(one_gadget("/nonexistent/libc.so.6"))
-        assert "error" in result
-
-    def test_output_parsing(self):
-        from unittest.mock import patch
-
-        mock_output = (
-            '0x4f2a5 execve("/bin/sh", rsp+0x40, environ)\n'
-            "constraints:\n"
-            "  [rsp+0x40] == NULL\n"
-            "  [[rsp+0x40]+0x8] == NULL\n"
-            "\n"
-            '0x4f302 execve("/bin/sh", rsp+0x70, environ)\n'
-            "constraints:\n"
-            "  [rsp+0x70] == NULL\n"
-        )
-        mock_result = {"stdout": mock_output, "stderr": "", "returncode": 0}
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            f.write(b"\x7fELF")
-            path = f.name
-        try:
-            with patch("ctf_pwn.run_tool", return_value=mock_result):
-                result = json.loads(one_gadget(path))
-                assert result["gadget_count"] == 2
-                assert result["gadgets"][0]["address"] == "0x4f2a5"
-                assert len(result["gadgets"][0]["constraints"]) == 2
-                assert result["gadgets"][1]["address"] == "0x4f302"
-        finally:
-            os.unlink(path)
-
-    def test_returns_valid_json(self):
-        from unittest.mock import patch
-
-        mock_result = {"stdout": "", "stderr": "", "returncode": 0}
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            f.write(b"\x7fELF")
-            path = f.name
-        try:
-            with patch("ctf_pwn.run_tool", return_value=mock_result):
-                json.loads(one_gadget(path))
-        finally:
-            os.unlink(path)
 
 
 # ── pwn_libc_lookup tests ───────────────────────────────────────────────────
@@ -710,32 +580,6 @@ class TestTriageMocked:
                 assert len(result["sections"]) == 1
                 assert "flag{test}" in result["strings_interesting"]
                 assert result["strings_total"] == 2
-        finally:
-            os.unlink(path)
-
-    def test_rop_gadgets_parsing(self):
-        """Mock ROPgadget output parsing."""
-        from unittest.mock import patch
-
-        mock_output = (
-            "Gadgets information\n"
-            "============================================================\n"
-            "0x0000000000401234 : pop rdi ; ret\n"
-            "0x0000000000401238 : pop rsi ; pop r15 ; ret\n"
-            "0x000000000040123c : ret\n"
-            "\n"
-            "Unique gadgets found: 3\n"
-        )
-        mock_result = {"stdout": mock_output, "stderr": "", "returncode": 0}
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            f.write(b"\x7fELF")
-            path = f.name
-        try:
-            with patch("ctf_pwn.run_tool", return_value=mock_result):
-                result = json.loads(find_rop_gadgets(path))
-                assert result["total_gadgets"] == 3
-                assert result["gadgets"][0]["address"] == "0x0000000000401234"
-                assert result["gadgets"][0]["instructions"] == "pop rdi ; ret"
         finally:
             os.unlink(path)
 

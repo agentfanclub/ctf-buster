@@ -21,7 +21,6 @@ def _unwrap(tool):
 gdb_run = _unwrap(ctf_gdb.gdb_run)
 gdb_break_inspect = _unwrap(ctf_gdb.gdb_break_inspect)
 gdb_trace_input = _unwrap(ctf_gdb.gdb_trace_input)
-gdb_memory_dump = _unwrap(ctf_gdb.gdb_memory_dump)
 gdb_checksec_runtime = _unwrap(ctf_gdb.gdb_checksec_runtime)
 
 
@@ -358,69 +357,6 @@ class TestGdbTraceInput:
             os.unlink(path)
 
 
-# ── gdb_memory_dump tool tests ──────────────────────────────────────────────
-
-
-class TestGdbMemoryDump:
-    def test_nonexistent_file(self):
-        result = json.loads(
-            gdb_memory_dump(
-                "/nonexistent/binary/xyz",
-                breakpoint="main",
-                addresses=["0x400000:16"],
-            )
-        )
-        assert "error" in result
-
-    def test_returns_valid_json(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            raw = gdb_memory_dump(path, breakpoint="main", addresses=["0x400000:16"])
-            parsed = json.loads(raw)
-            assert "path" in parsed
-            assert "breakpoint" in parsed
-            assert "memory" in parsed
-        finally:
-            os.unlink(path)
-
-    def test_address_specs_preserved(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            result = json.loads(
-                gdb_memory_dump(
-                    path,
-                    breakpoint="main",
-                    addresses=["0x400000:16", "$rsp:32"],
-                )
-            )
-            assert len(result["memory"]) == 2
-            assert result["memory"][0]["address"] == "0x400000:16"
-            assert result["memory"][1]["address"] == "$rsp:32"
-        finally:
-            os.unlink(path)
-
-    def test_invalid_hex_stdin(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            result = json.loads(
-                gdb_memory_dump(
-                    path,
-                    breakpoint="main",
-                    addresses=["0x400000:16"],
-                    stdin_hex="ZZZZ",
-                )
-            )
-            assert "error" in result
-        finally:
-            os.unlink(path)
-
-
 # ── gdb_checksec_runtime tool tests ─────────────────────────────────────────
 
 
@@ -468,10 +404,6 @@ class TestJsonOutput:
 
     def test_gdb_trace_input_always_json(self):
         raw = gdb_trace_input("/dev/null")
-        json.loads(raw)
-
-    def test_gdb_memory_dump_always_json(self):
-        raw = gdb_memory_dump("/dev/null", breakpoint="main", addresses=["0x0:1"])
         json.loads(raw)
 
     def test_gdb_checksec_runtime_always_json(self):
@@ -572,31 +504,5 @@ class TestGdbOutputParsing:
                 assert "libc_base" in result
                 assert result["libc_base"] == "0x7f1234000000"
                 assert result["resolved_symbols"]["system"] == "0x7f1234050d60"
-        finally:
-            os.unlink(path)
-
-    def test_memory_dump_parsing(self):
-        """Mock GDB memory dump output."""
-        from unittest.mock import patch
-
-        gdb_output = (
-            "Breakpoint 1, main () at test.c:5\n"
-            "===DUMP_0x404000:64===\n"
-            "0x404000:\t0x48\t0x65\t0x6c\t0x6c\n"
-            "===ASCII_0x404000:64===\n"
-            "0x404000:\t72 'H'\t101 'e'\t108 'l'\t108 'l'\n"
-        )
-        mock_result = {"stdout": gdb_output, "stderr": "", "returncode": 0}
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            with patch("ctf_gdb._run_gdb", return_value=mock_result):
-                result = json.loads(
-                    gdb_memory_dump(path, breakpoint="main", addresses=["0x404000:64"])
-                )
-                assert len(result["memory"]) == 1
-                assert "hex_dump" in result["memory"][0]
         finally:
             os.unlink(path)

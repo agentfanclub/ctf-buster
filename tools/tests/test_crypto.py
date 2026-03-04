@@ -25,7 +25,6 @@ def _unwrap(tool):
 transform_chain = _unwrap(ctf_crypto.crypto_transform_chain)
 crypto_identify = _unwrap(ctf_crypto.crypto_identify)
 frequency_analysis = _unwrap(ctf_crypto.crypto_frequency_analysis)
-hash_crack = _unwrap(ctf_crypto.crypto_hash_crack)
 
 # ── _apply_op tests ──────────────────────────────────────────────────────────
 
@@ -476,85 +475,6 @@ class TestFrequencyAnalysis:
         assert "character_frequencies" in parsed
 
 
-# ── hash_crack tests ─────────────────────────────────────────────────────────
-
-
-class TestHashCrack:
-    def test_identify_md5_length(self):
-        md5 = hashlib.md5(b"anything").hexdigest()
-        result = json.loads(hash_crack(md5))
-        assert "MD5" in result["possible_types"]
-        assert result["length"] == 32
-
-    def test_identify_sha1_length(self):
-        sha1 = hashlib.sha1(b"anything").hexdigest()
-        result = json.loads(hash_crack(sha1))
-        assert "SHA-1" in result["possible_types"]
-        assert result["length"] == 40
-
-    def test_identify_sha256_length(self):
-        sha256 = hashlib.sha256(b"anything").hexdigest()
-        result = json.loads(hash_crack(sha256))
-        assert "SHA-256" in result["possible_types"]
-        assert result["length"] == 64
-
-    def test_identify_bcrypt(self):
-        bcrypt_hash = "$2b$12$LJ3m4ys3Lg2VYmOgPlLQaO1cFwZmPJQE8c5pM3fM.DLMV4tykqFi"
-        result = json.loads(hash_crack(bcrypt_hash))
-        assert "bcrypt" in result["possible_types"]
-
-    def test_identify_md5_crypt(self):
-        result = json.loads(hash_crack("$1$salt$hash"))
-        assert "MD5 crypt" in result["possible_types"]
-
-    def test_identify_sha256_crypt(self):
-        result = json.loads(hash_crack("$5$salt$hash"))
-        assert "SHA-256 crypt" in result["possible_types"]
-
-    def test_identify_sha512_crypt(self):
-        result = json.loads(hash_crack("$6$salt$hash"))
-        assert "SHA-512 crypt" in result["possible_types"]
-
-    def test_crack_md5_from_default_wordlist(self):
-        # "password" is in the default wordlist
-        md5 = hashlib.md5(b"password").hexdigest()
-        result = json.loads(hash_crack(md5))
-        assert result["cracked"] is True
-        assert result["plaintext"] == "password"
-        assert result["hash_type"] == "md5"
-
-    def test_crack_sha1_from_default_wordlist(self):
-        sha1 = hashlib.sha1(b"admin").hexdigest()
-        result = json.loads(hash_crack(sha1))
-        assert result["cracked"] is True
-        assert result["plaintext"] == "admin"
-
-    def test_crack_sha256_from_default_wordlist(self):
-        sha256 = hashlib.sha256(b"hello").hexdigest()
-        result = json.loads(hash_crack(sha256))
-        assert result["cracked"] is True
-        assert result["plaintext"] == "hello"
-
-    def test_crack_with_custom_wordlist(self):
-        md5 = hashlib.md5(b"myspecialword").hexdigest()
-        result = json.loads(hash_crack(md5, wordlist="myspecialword\nother"))
-        assert result["cracked"] is True
-        assert result["plaintext"] == "myspecialword"
-
-    def test_crack_fails_unknown_hash(self):
-        # A hash of something NOT in the default wordlist
-        md5 = hashlib.md5(b"verylongandunusualpassword42").hexdigest()
-        result = json.loads(hash_crack(md5))
-        assert result["cracked"] is False
-
-    def test_returns_valid_json(self):
-        raw = hash_crack("d41d8cd98f00b204e9800998ecf8427e")
-        parsed = json.loads(raw)
-        assert "hash" in parsed
-        assert "length" in parsed
-        assert "possible_types" in parsed
-
-
 # ── crypto_rsa_toolkit tests ─────────────────────────────────────────────────
 
 rsa_toolkit = _unwrap(ctf_crypto.crypto_rsa_toolkit)
@@ -893,60 +813,6 @@ class TestXorAnalyzeEdgeCases:
     def test_returns_valid_json(self):
         result = json.loads(xor_analyze("414243"))
         assert "data_length" in result
-
-
-# ── crypto_sage_solve tests ─────────────────────────────────────────────────
-
-sage_solve = _unwrap(ctf_crypto.crypto_sage_solve)
-
-
-class TestSageSolve:
-    def test_sage_not_found(self):
-        from unittest.mock import patch
-
-        with patch("shutil.which", return_value=None):
-            result = json.loads(sage_solve("print(42)"))
-            assert "error" in result
-            assert "sage" in result["error"].lower()
-
-    def test_sage_runs_script(self):
-        from unittest.mock import patch
-
-        mock_result = {"stdout": "42\n", "stderr": "", "returncode": 0}
-        with patch("ctf_crypto.run_tool", return_value=mock_result):
-            with patch("shutil.which", return_value="/usr/bin/sage"):
-                result = json.loads(sage_solve("print(42)"))
-                assert result["stdout"] == "42\n"
-                assert result["returncode"] == 0
-
-    def test_sage_json_output(self):
-        from unittest.mock import patch
-
-        mock_result = {"stdout": '{"x": 5}', "stderr": "", "returncode": 0}
-        with patch("ctf_crypto.run_tool", return_value=mock_result):
-            with patch("shutil.which", return_value="/usr/bin/sage"):
-                result = json.loads(
-                    sage_solve('import json; print(json.dumps({"x": 5}))')
-                )
-                assert result["parsed"] == {"x": 5}
-
-    def test_sage_timeout_passed(self):
-        from unittest.mock import call, patch
-
-        mock_result = {"stdout": "", "stderr": "", "returncode": 0}
-        with patch("ctf_crypto.run_tool", return_value=mock_result) as mock_run:
-            with patch("shutil.which", return_value="/usr/bin/sage"):
-                sage_solve("print(1)", timeout=30)
-                args, kwargs = mock_run.call_args
-                assert kwargs.get("timeout") == 30 or (len(args) > 1 and args[1] == 30)
-
-    def test_returns_valid_json(self):
-        from unittest.mock import patch
-
-        mock_result = {"stdout": "ok\n", "stderr": "", "returncode": 0}
-        with patch("ctf_crypto.run_tool", return_value=mock_result):
-            with patch("shutil.which", return_value="/usr/bin/sage"):
-                json.loads(sage_solve("print('ok')"))
 
 
 # ── TestCryptoIdentifyCaesar ────────────────────────────────────────────────

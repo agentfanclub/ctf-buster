@@ -655,9 +655,7 @@ impl McpServer {
 Use crypto_identify to detect encoding/cipher type, then:\n\
 - Encoding/XOR: crypto_transform_chain for decode pipelines, crypto_xor_analyze for key recovery from ciphertext\n\
 - RSA: crypto_rsa_toolkit (auto-tries factordb, fermat, wiener, small-e)\n\
-- Hash cracking: crypto_hash_crack (MD5, SHA1/256/512, bcrypt, etc. with wordlists and rules)\n\
 - Constraints/math: crypto_math_solve (z3 for integer constraints, eval for sympy)\n\
-- Advanced (finite fields, lattice, DLP): crypto_sage_solve with a SageMath script\n\
 - Classical ciphers: crypto_frequency_analysis + crypto_transform_chain with rot/vigenere/atbash\n\
 Start with crypto_identify. If data looks like hex/base64, try crypto_transform_chain. If XOR, use crypto_xor_analyze.",
         "forensics" | "forensic" => "\
@@ -666,15 +664,13 @@ Use forensics_file_triage first (file type, metadata, embedded data, entropy), t
 - Embedded files: forensics_extract_embedded (binwalk + foremost)\n\
 - Images: forensics_image_analysis (channels, LSB, histogram anomalies)\n\
 - Encrypted/compressed regions: forensics_entropy_analysis\n\
-- Memory dumps (.raw, .vmem, .dmp): forensics_volatility with plugins (windows.pslist, windows.filescan, windows.hashdump, windows.cmdline)",
+- Memory dumps (.raw, .vmem, .dmp): use volatility3 from bash (vol -f dump.raw windows.pslist, etc.)",
         "web" | "web exploitation" => "Use curl, sqlmap, ffuf from bash. Check source code, headers, cookies, robots.txt. Common patterns: SQL injection, XSS, SSRF, path traversal, deserialization.",
         "rev" | "reverse" | "reverse engineering" | "reversing" => "\
 Start with rev_functions for an overview, then rev_decompile for pseudocode of key functions.\n\
-- Call graph: rev_xrefs to trace who calls what\n\
 - Interesting strings: rev_strings_xrefs to find functions referencing flag/password/key\n\
-- Control flow: rev_cfg for branch conditions and basic blocks\n\
-- Binary diff: rev_diff for patched vs original\n\
 - Runtime validation: gdb_run for arbitrary GDB commands, gdb_break_inspect to confirm static analysis\n\
+- Use r2 directly from bash for xrefs (axtj/axfj), CFG (agfj), and binary diff (radiff2)\n\
 - Automated solving: pwn_angr_analyze in auto/find_string mode for simple checks",
         "jail" | "jailed" | "pyjail" | "sandbox" | "escape" => "\
 Read the jail source code first, then use jail_analyze_source to identify restrictions.\n\
@@ -687,18 +683,17 @@ Test payloads interactively against the remote service via pwntools.",
 Use pwn_triage first (checksec, imports, dangerous functions, architecture), then:\n\
 - Buffer overflow: gdb_trace_input (cyclic pattern + crash), pwn_pattern_offset\n\
 - Format string: pwn_format_string to find offset and generate write payloads\n\
-- Disassembly: pwn_disassemble to read specific functions (complements rev_decompile)\n\
-- ROP: pwn_rop_gadgets for gadgets, pwn_pwntools_template for exploit skeleton\n\
-- Libc attacks: pwn_one_gadget on libc for single-gadget RCE, pwn_libc_lookup to identify libc from leaks\n\
+- ROP: pwn_pwntools_template for exploit skeleton (use ROPgadget/one_gadget from bash)\n\
+- Libc attacks: pwn_libc_lookup to identify libc from leaks\n\
 - Shellcode: pwn_shellcode_generate for payload generation\n\
-- Dynamic analysis: gdb_run for arbitrary GDB commands, gdb_break_inspect, gdb_memory_dump, gdb_checksec_runtime\n\
+- Dynamic analysis: gdb_run for arbitrary GDB commands, gdb_break_inspect, gdb_checksec_runtime\n\
 - Auto-solve: pwn_angr_analyze for simple challenges",
         _ => "\
 Use forensics_file_triage on any downloaded files to determine content type, then:\n\
 - Binary files: pwn_triage or rev_functions\n\
 - Images/media: forensics_stego_analyze\n\
 - Encoded text: crypto_identify + crypto_transform_chain\n\
-- Memory dumps: forensics_volatility",
+- Memory dumps: use volatility3 from bash (vol -f dump.raw windows.pslist)",
       };
 
       let files_str = if files.is_empty() { "None attached".to_string() } else { files.join(", ") };

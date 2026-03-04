@@ -1,6 +1,6 @@
 # CTF-Buster
 
-AI-powered CTF competition toolkit. Rust CLI + 7 MCP servers (54 tools total).
+AI-powered CTF competition toolkit. Rust CLI + 7 MCP servers (44 tools total).
 
 ## Architecture
 
@@ -185,45 +185,37 @@ For parallel execution, launch multiple subagents in a single message using the 
 - `crypto_identify` to detect encoding/cipher type
 - `crypto_transform_chain` for multi-step decode pipelines
 - `crypto_rsa_toolkit` for RSA challenges (auto-tries factordb, fermat, wiener, small-e)
-- `crypto_hash_crack` for hash cracking (MD5, SHA1/256/512, bcrypt — wordlists and rules)
 - `crypto_math_solve` with z3 mode for constraint problems
 - `crypto_frequency_analysis` for classical ciphers
 - `crypto_xor_analyze` for XOR/stream cipher challenges (known-plaintext, Kasiski, IC, brute force)
-- `crypto_sage_solve` to run SageMath scripts for finite field, lattice, and DLP problems
+- For SageMath and hash cracking: use `sage` and `hashcat`/`john` directly from bash
 
 **Binary/Pwn challenges:** (solve.py has a pwntools skeleton with ELF/remote setup — fill in the exploit)
 - `pwn_triage` first — get checksec, imports, dangerous functions, architecture
-- `pwn_disassemble` to read key functions
 - `rev_decompile` for pseudocode (r2ghidra/r2dec fallback chain)
 - `rev_functions` to list all functions with sizes and call targets
-- `rev_xrefs` to trace call graphs and cross-references
-- `rev_cfg` for control flow graph analysis
 - `rev_strings_xrefs` to find which functions reference interesting strings
 - `gdb_break_inspect` to examine registers/stack/memory at breakpoints
 - `gdb_trace_input` to find buffer overflow offsets (cyclic pattern + crash analysis)
-- `gdb_memory_dump` to read memory at specific addresses during execution
 - `gdb_checksec_runtime` for runtime security info (ASLR, libc base, GOT, symbols)
 - `gdb_run` for general GDB command execution
 - `pwn_angr_analyze` for automatic solving of simple stack-based challenges:
   - `auto` mode: finds inputs producing flag-like output
   - `find_addr` mode: finds inputs reaching a specific address
   - `find_string` mode: finds inputs causing specific output
-- `pwn_rop_gadgets` for ROP chains
 - `pwn_pattern_offset` to find buffer overflow offsets
 - `pwn_pwntools_template` to generate exploit scripts
 - `pwn_shellcode_generate` for shellcode payloads
 - `pwn_format_string` for format string exploit automation (probe for offset, generate write payloads)
-- `pwn_one_gadget` to find single-instruction RCE gadgets in libc
 - `pwn_libc_lookup` to identify libc version from leaked symbol addresses (libc.rip API)
+- For ROP gadgets, one_gadget, disassembly: use `ROPgadget`, `one_gadget`, `r2` directly from bash
 
 **Reverse engineering challenges:** (solve.py has subprocess/struct imports — add decoder/keygen logic)
 - `rev_functions` to get an overview of all functions
 - `rev_decompile` for pseudocode of key functions
-- `rev_xrefs` to trace call graphs (who calls what)
 - `rev_strings_xrefs` to find functions referencing flag/password/key strings
-- `rev_cfg` to analyze control flow and branch conditions
-- `rev_diff` to compare patched vs original binaries
 - `gdb_run` for arbitrary GDB commands, `gdb_break_inspect` to validate static analysis with runtime state
+- For xrefs, CFG, binary diff: use `r2` and `radiff2` directly from bash
 
 **Forensics/Stego challenges:** (solve.py is minimal — most work uses MCP tools, add extraction logic if needed)
 - `forensics_file_triage` first — get file type, metadata, embedded data, entropy
@@ -231,7 +223,7 @@ For parallel execution, launch multiple subagents in a single message using the 
 - `forensics_extract_embedded` for binwalk/foremost extraction
 - `forensics_entropy_analysis` to find encrypted/compressed regions
 - `forensics_image_analysis` for deep image inspection (LSB, channels, histograms)
-- `forensics_volatility` for memory dump analysis (.raw, .vmem, .dmp) — runs volatility3 plugins
+- For memory dumps: use `vol` (volatility3) directly from bash
 
 **Web challenges:** (solve.py has a requests session template — build your exploit there)
 - Use bash directly: curl, sqlmap, ffuf, nuclei, nikto, etc.

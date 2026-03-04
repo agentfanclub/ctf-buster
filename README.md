@@ -12,7 +12,7 @@ workspace.
   track scores on CTFd and rCTF with automatic platform detection.
 - **Workspace management** -- initialize per-competition workspaces with
   scaffolded directories, solve templates, and notes files.
-- **7 MCP servers / 54 tools** -- expose every capability over MCP so AI agents
+- **7 MCP servers / 44 tools** -- expose every capability over MCP so AI agents
   can call them directly.
 - **TUI dashboard** -- run `ctf dashboard` in a separate terminal to monitor
   progress in real-time while the AI orchestrator works.

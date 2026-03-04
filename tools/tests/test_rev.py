@@ -19,11 +19,8 @@ def _unwrap(tool):
 
 # Access underlying functions from FastMCP tool wrappers
 rev_functions = _unwrap(ctf_rev.rev_functions)
-rev_xrefs = _unwrap(ctf_rev.rev_xrefs)
 rev_decompile = _unwrap(ctf_rev.rev_decompile)
 rev_strings_xrefs = _unwrap(ctf_rev.rev_strings_xrefs)
-rev_cfg = _unwrap(ctf_rev.rev_cfg)
-rev_diff = _unwrap(ctf_rev.rev_diff)
 
 
 # ── _parse_r2_json tests ────────────────────────────────────────────────────
@@ -119,58 +116,6 @@ class TestR2Functions:
                 os.unlink(link_path)
 
 
-# ── rev_xrefs tool tests ────────────────────────────────────────────────────
-
-
-class TestR2Xrefs:
-    def test_nonexistent_file(self):
-        result = json.loads(rev_xrefs("/nonexistent/binary/xyz", target="main"))
-        assert "error" in result
-
-    def test_returns_valid_json(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            raw = rev_xrefs(path, target="main")
-            parsed = json.loads(raw)
-            assert "path" in parsed
-            assert "target" in parsed
-        finally:
-            os.unlink(path)
-
-    def test_direction_both(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            result = json.loads(rev_xrefs(path, target="main", direction="both"))
-            assert "xrefs_to" in result
-            assert "xrefs_from" in result
-        finally:
-            os.unlink(path)
-
-    def test_direction_to(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            result = json.loads(rev_xrefs(path, target="main", direction="to"))
-            assert "xrefs_to" in result
-        finally:
-            os.unlink(path)
-
-    def test_hex_address_target(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            result = json.loads(rev_xrefs(path, target="0x401000"))
-            assert result["target"] == "0x401000"
-        finally:
-            os.unlink(path)
-
-
 # ── rev_decompile tool tests ────────────────────────────────────────────────
 
 
@@ -256,104 +201,6 @@ class TestR2StringsXrefs:
             os.unlink(path)
 
 
-# ── rev_cfg tool tests ──────────────────────────────────────────────────────
-
-
-class TestR2Cfg:
-    def test_nonexistent_file(self):
-        result = json.loads(rev_cfg("/nonexistent/binary/xyz"))
-        assert "error" in result
-
-    def test_returns_valid_json(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            raw = rev_cfg(path)
-            parsed = json.loads(raw)
-            assert isinstance(parsed, dict)
-        finally:
-            os.unlink(path)
-
-    def test_custom_function(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            result = json.loads(rev_cfg(path, function="vuln"))
-            assert isinstance(result, dict)
-        finally:
-            os.unlink(path)
-
-
-# ── rev_diff tool tests ─────────────────────────────────────────────────────
-
-
-class TestR2Diff:
-    def test_nonexistent_file1(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"data")
-            path2 = f.name
-        try:
-            result = json.loads(rev_diff("/nonexistent/xyz", path2))
-            assert "error" in result
-        finally:
-            os.unlink(path2)
-
-    def test_nonexistent_file2(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"data")
-            path1 = f.name
-        try:
-            result = json.loads(rev_diff(path1, "/nonexistent/xyz"))
-            assert "error" in result
-        finally:
-            os.unlink(path1)
-
-    def test_identical_files(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            result = json.loads(rev_diff(path, path))
-            assert "file1" in result
-            assert "file2" in result
-            assert "differences" in result
-        finally:
-            os.unlink(path)
-
-    def test_different_files(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f1:
-            f1.write(b"\x7fELF" + b"\x00" * 100)
-            path1 = f1.name
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f2:
-            f2.write(b"\x7fELF" + b"\x01" * 100)
-            path2 = f2.name
-        try:
-            result = json.loads(rev_diff(path1, path2))
-            assert "file1" in result
-            assert "file2" in result
-            assert "diff_count" in result
-        finally:
-            os.unlink(path1)
-            os.unlink(path2)
-
-    def test_returns_valid_json(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"data1")
-            path1 = f.name
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-            f.write(b"data2")
-            path2 = f.name
-        try:
-            raw = rev_diff(path1, path2)
-            parsed = json.loads(raw)
-            assert isinstance(parsed, dict)
-        finally:
-            os.unlink(path1)
-            os.unlink(path2)
-
-
 # ── Integration: all tools return valid JSON ────────────────────────────────
 
 
@@ -364,24 +211,12 @@ class TestJsonOutput:
         raw = rev_functions("/dev/null")
         json.loads(raw)
 
-    def test_r2_xrefs_always_json(self):
-        raw = rev_xrefs("/dev/null", target="main")
-        json.loads(raw)
-
     def test_r2_decompile_always_json(self):
         raw = rev_decompile("/dev/null")
         json.loads(raw)
 
     def test_r2_strings_xrefs_always_json(self):
         raw = rev_strings_xrefs("/dev/null")
-        json.loads(raw)
-
-    def test_r2_cfg_always_json(self):
-        raw = rev_cfg("/dev/null")
-        json.loads(raw)
-
-    def test_r2_diff_always_json(self):
-        raw = rev_diff("/dev/null", "/dev/null")
         json.loads(raw)
 
 
@@ -506,72 +341,5 @@ class TestRevMocked:
                 result = json.loads(rev_strings_xrefs(path))
                 assert result["count"] == 2
                 assert result["strings"][0]["string"] == "Enter password:"
-        finally:
-            os.unlink(path)
-
-    def test_cfg_block_parsing(self):
-        """Mock r2 CFG with blocks, jumps, and fails."""
-        from unittest.mock import patch
-
-        cfg_data = json.dumps(
-            [
-                {
-                    "offset": 0x401000,
-                    "size": 20,
-                    "jump": 0x401020,
-                    "fail": 0x401040,
-                    "ops": [
-                        {"offset": 0x401000, "disasm": "cmp eax, 0", "type": "cmp"},
-                        {"offset": 0x401004, "disasm": "je 0x401020", "type": "cjmp"},
-                    ],
-                },
-                {
-                    "offset": 0x401020,
-                    "size": 10,
-                    "ops": [
-                        {"offset": 0x401020, "disasm": "call sym.win", "type": "call"}
-                    ],
-                },
-            ]
-        )
-        mock_result = {"stdout": cfg_data, "stderr": "", "returncode": 0}
-
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            with patch("ctf_rev.run_tool", return_value=mock_result):
-                result = json.loads(rev_cfg(path))
-                assert result["block_count"] == 2
-                assert result["blocks"][0]["jump"] == "0x401020"
-                assert result["blocks"][0]["fail"] == "0x401040"
-                assert result["blocks"][0]["instruction_count"] == 2
-        finally:
-            os.unlink(path)
-
-    def test_xrefs_direction_from(self):
-        """Test xrefs with direction='from' only."""
-        from unittest.mock import patch
-
-        xref_data = json.dumps(
-            [
-                {
-                    "from": 0x401000,
-                    "addr": 0x401100,
-                    "type": "CALL",
-                    "opcode": "call sym.helper",
-                }
-            ]
-        )
-        mock_result = {"stdout": xref_data, "stderr": "", "returncode": 0}
-
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            f.write(b"\x7fELF" + b"\x00" * 100)
-            path = f.name
-        try:
-            with patch("ctf_rev.run_tool", return_value=mock_result):
-                result = json.loads(rev_xrefs(path, target="main", direction="from"))
-                assert len(result["xrefs_from"]) == 1
-                assert len(result["xrefs_to"]) == 0
         finally:
             os.unlink(path)
