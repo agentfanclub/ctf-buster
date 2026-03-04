@@ -5,19 +5,25 @@ import base64
 import codecs
 import hashlib
 import json
+import os
 import re
 import string
+import sys
 import urllib.parse
 from collections import Counter
 
+sys.path.insert(0, os.path.dirname(__file__))
 from fastmcp import FastMCP
+from lib.subprocess_utils import run_tool
 
 mcp = FastMCP(
     "ctf-crypto",
     instructions=(
         "Cryptographic analysis and encoding tools for CTF challenges. "
         "Use crypto_transform_chain for encoding/decoding pipelines, crypto_identify to detect "
-        "encoding types, crypto_rsa_toolkit for RSA attacks, crypto_math_solve for constraint solving."
+        "encoding types, crypto_xor_analyze for XOR key recovery, crypto_rsa_toolkit for RSA attacks, "
+        "crypto_math_solve for constraint solving, crypto_sage_solve for SageMath scripts "
+        "(finite fields, lattice reduction, discrete log)."
     ),
 )
 
@@ -711,6 +717,257 @@ def crypto_frequency_analysis(text: str) -> str:
         },
         indent=2,
     )
+
+
+# ── xor_analyze ───────────────────────────────────────────────────────────────
+
+# English letter frequencies (shared with frequency_analysis)
+_ENGLISH_FREQ = {
+    "a": 8.167,
+    "b": 1.492,
+    "c": 2.782,
+    "d": 4.253,
+    "e": 12.702,
+    "f": 2.228,
+    "g": 2.015,
+    "h": 6.094,
+    "i": 6.966,
+    "j": 0.153,
+    "k": 0.772,
+    "l": 4.025,
+    "m": 2.406,
+    "n": 6.749,
+    "o": 7.507,
+    "p": 1.929,
+    "q": 0.095,
+    "r": 5.987,
+    "s": 6.327,
+    "t": 9.056,
+    "u": 2.758,
+    "v": 0.978,
+    "w": 2.360,
+    "x": 0.150,
+    "y": 1.974,
+    "z": 0.074,
+}
+
+
+def _chi_squared_score(data: bytes) -> float:
+    """Score how close byte frequencies are to English letter frequencies."""
+    total = len(data)
+    if total == 0:
+        return float("inf")
+    counts = Counter(data)
+    chi_sq = 0.0
+    for letter, expected_pct in _ENGLISH_FREQ.items():
+        observed = counts.get(ord(letter), 0) + counts.get(ord(letter.upper()), 0)
+        observed_pct = observed / total * 100
+        if expected_pct > 0:
+            chi_sq += (observed_pct - expected_pct) ** 2 / expected_pct
+    return chi_sq
+
+
+def _find_repeating_key_length(key_bytes: bytes) -> int:
+    """Find the shortest repeating period in recovered key bytes."""
+    for period in range(1, len(key_bytes) + 1):
+        if all(key_bytes[i] == key_bytes[i % period] for i in range(len(key_bytes))):
+            return period
+    return len(key_bytes)
+
+
+def _kasiski_examination(data: bytes) -> dict[int, int]:
+    """Find repeated trigrams and compute GCD of distances between them."""
+    from math import gcd
+
+    trigram_positions: dict[bytes, list[int]] = {}
+    for i in range(len(data) - 2):
+        tri = data[i : i + 3]
+        trigram_positions.setdefault(tri, []).append(i)
+
+    distances: list[int] = []
+    for positions in trigram_positions.values():
+        if len(positions) >= 2:
+            for i in range(len(positions) - 1):
+                distances.append(positions[i + 1] - positions[i])
+
+    if not distances:
+        return {}
+
+    # Count how often each small factor divides the distances
+    factor_scores: dict[int, int] = {}
+    for d in distances:
+        for k in range(2, min(d + 1, 33)):
+            if d % k == 0:
+                factor_scores[k] = factor_scores.get(k, 0) + 1
+    return factor_scores
+
+
+def _index_of_coincidence(data: bytes) -> float:
+    """Compute index of coincidence for a byte sequence."""
+    n = len(data)
+    if n <= 1:
+        return 0.0
+    counts = Counter(data)
+    return sum(c * (c - 1) for c in counts.values()) / (n * (n - 1))
+
+
+@mcp.tool()
+def crypto_xor_analyze(
+    data_hex: str,
+    known_plaintext: str = "",
+    known_plaintext_hex: str = "",
+    max_key_length: int = 32,
+) -> str:
+    """Analyze XOR-encrypted data: recover keys from known plaintext, estimate key length, brute-force single-byte keys.
+
+    Args:
+        data_hex: Hex-encoded ciphertext
+        known_plaintext: Known plaintext (ASCII) for key recovery
+        known_plaintext_hex: Known plaintext (hex) for key recovery (binary data)
+        max_key_length: Maximum key length to test for IC/Kasiski analysis (default 32)
+    """
+    try:
+        data = bytes.fromhex(
+            data_hex.replace(" ", "").replace("0x", "").replace("\\x", "")
+        )
+    except ValueError as e:
+        return json.dumps({"error": f"Invalid hex data: {e}"}, indent=2)
+
+    if len(data) == 0:
+        return json.dumps({"error": "Empty data"}, indent=2)
+
+    result: dict = {"data_length": len(data)}
+
+    # Known-plaintext key recovery
+    if known_plaintext or known_plaintext_hex:
+        if known_plaintext_hex:
+            pt = bytes.fromhex(known_plaintext_hex.replace(" ", ""))
+        else:
+            pt = known_plaintext.encode()
+
+        key_bytes = bytes(data[i] ^ pt[i] for i in range(min(len(data), len(pt))))
+        repeating_len = _find_repeating_key_length(key_bytes)
+        key_short = key_bytes[:repeating_len]
+        result["known_plaintext_key"] = {
+            "key_hex": key_short.hex(),
+            "key_ascii": key_short.decode("ascii", errors="replace"),
+            "repeating_length": repeating_len,
+            "raw_key_hex": key_bytes.hex(),
+        }
+        # Decrypt with recovered key
+        full_key = (key_short * ((len(data) // repeating_len) + 1))[: len(data)]
+        decrypted = bytes(d ^ k for d, k in zip(data, full_key))
+        result["decrypted_preview"] = decrypted[:200].decode("ascii", errors="replace")
+
+    # Key length estimation via IC
+    ic_scores = []
+    for kl in range(1, min(max_key_length + 1, len(data) // 2 + 1)):
+        streams = [data[i::kl] for i in range(kl)]
+        avg_ic = sum(_index_of_coincidence(s) for s in streams) / kl
+        ic_scores.append({"length": kl, "ic_score": round(avg_ic, 5)})
+    ic_scores.sort(key=lambda x: abs(x["ic_score"] - 0.0667))
+    result["key_length_candidates"] = ic_scores[:5]
+
+    # Kasiski examination
+    kasiski = _kasiski_examination(data)
+    if kasiski:
+        kasiski_ranked = sorted(kasiski.items(), key=lambda x: x[1], reverse=True)[:5]
+        result["kasiski_candidates"] = [
+            {"length": k, "score": v} for k, v in kasiski_ranked
+        ]
+
+    # Single-byte XOR brute force
+    single_byte_results = []
+    for key_byte in range(256):
+        decrypted = bytes(b ^ key_byte for b in data)
+        score = _chi_squared_score(decrypted)
+        if score < 100:
+            preview = decrypted[:80].decode("ascii", errors="replace")
+            single_byte_results.append(
+                {
+                    "key_byte": f"0x{key_byte:02x}",
+                    "chi_squared": round(score, 2),
+                    "preview": preview,
+                }
+            )
+    single_byte_results.sort(key=lambda x: x["chi_squared"])
+    result["single_byte_results"] = single_byte_results[:5]
+
+    # Multi-byte recovery for best IC candidate
+    if ic_scores and not (known_plaintext or known_plaintext_hex):
+        best_kl = ic_scores[0]["length"]
+        if best_kl <= max_key_length:
+            key_bytes_recovered = []
+            for i in range(best_kl):
+                stream = data[i::best_kl]
+                best_byte = min(
+                    range(256),
+                    key=lambda b: _chi_squared_score(bytes(x ^ b for x in stream)),
+                )
+                key_bytes_recovered.append(best_byte)
+            key = bytes(key_bytes_recovered)
+            full_key = (key * ((len(data) // best_kl) + 1))[: len(data)]
+            decrypted = bytes(d ^ k for d, k in zip(data, full_key))
+            score = _chi_squared_score(decrypted)
+            result["best_decryption"] = {
+                "key_length": best_kl,
+                "key_hex": key.hex(),
+                "key_ascii": key.decode("ascii", errors="replace"),
+                "chi_squared": round(score, 2),
+                "plaintext_preview": decrypted[:200].decode("ascii", errors="replace"),
+            }
+
+    return json.dumps(result, indent=2)
+
+
+# ── sage_solve ────────────────────────────────────────────────────────────────
+
+
+@mcp.tool()
+def crypto_sage_solve(
+    script: str,
+    timeout: int = 60,
+) -> str:
+    """Execute a SageMath script for advanced cryptographic computations.
+
+    Runs the given Sage code and captures output. Use for finite field arithmetic,
+    lattice reduction (LLL), discrete logarithm, polynomial solving over GF(p), etc.
+
+    Args:
+        script: SageMath code to execute. The script should print() its results.
+        timeout: Execution timeout in seconds (default 60)
+
+    Example:
+        crypto_sage_solve("p = 2^127 - 1; print(is_prime(p))")
+        crypto_sage_solve("R.<x> = GF(7)[]; print(factor(x^3 + 2*x + 1))")
+    """
+    import shutil
+    import tempfile
+
+    sage_path = shutil.which("sage")
+    if not sage_path:
+        return json.dumps({"error": "sage not found in PATH"}, indent=2)
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".sage", delete=False) as f:
+        f.write(script)
+        tmp = f.name
+
+    try:
+        r = run_tool(["sage", tmp], timeout=timeout)
+        result: dict = {
+            "stdout": r["stdout"],
+            "stderr": r["stderr"],
+            "returncode": r["returncode"],
+        }
+        if r.get("error"):
+            result["error"] = r["error"]
+        try:
+            result["parsed"] = json.loads(r["stdout"])
+        except (json.JSONDecodeError, ValueError):
+            pass
+        return json.dumps(result, indent=2)
+    finally:
+        os.unlink(tmp)
 
 
 if __name__ == "__main__":

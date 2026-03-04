@@ -794,3 +794,151 @@ class TestMathSolveUnknownMode:
     def test_unknown_mode(self):
         result = json.loads(math_solve("unknown", "1+1"))
         assert "error" in result
+
+
+# ── crypto_xor_analyze tests ────────────────────────────────────────────────
+
+xor_analyze = ctf_crypto.crypto_xor_analyze.fn
+
+
+class TestXorAnalyzeKnownPlaintext:
+    def test_recovers_key(self):
+        plaintext = b"Hello World"
+        key = b"KEY"
+        ciphertext = bytes(p ^ key[i % len(key)] for i, p in enumerate(plaintext))
+        result = json.loads(
+            xor_analyze(ciphertext.hex(), known_plaintext="Hello World")
+        )
+        assert "known_plaintext_key" in result
+        assert result["known_plaintext_key"]["key_hex"] == key.hex()
+        assert result["known_plaintext_key"]["repeating_length"] == 3
+
+    def test_recovers_key_hex_plaintext(self):
+        plaintext = b"\x00\x01\x02\x03"
+        key = b"\xab"
+        ciphertext = bytes(p ^ key[i % len(key)] for i, p in enumerate(plaintext))
+        result = json.loads(
+            xor_analyze(ciphertext.hex(), known_plaintext_hex=plaintext.hex())
+        )
+        assert result["known_plaintext_key"]["key_hex"] == "ab"
+
+    def test_decrypts_full_message(self):
+        plaintext = b"The flag is flag{test}"
+        key = b"XOR"
+        ciphertext = bytes(p ^ key[i % len(key)] for i, p in enumerate(plaintext))
+        result = json.loads(
+            xor_analyze(ciphertext.hex(), known_plaintext="The flag is ")
+        )
+        assert "flag{test}" in result["decrypted_preview"]
+
+
+class TestXorAnalyzeSingleByte:
+    def test_brute_force_finds_key(self):
+        plaintext = (
+            b"The quick brown fox jumps over the lazy dog and then runs across "
+            b"the field to the other side where the sheep are grazing in the sun "
+            b"and the birds are singing in the trees while the wind blows gently "
+            b"through the valley below the mountains that rise up in the distance"
+        )
+        key_byte = 0x42
+        ciphertext = bytes(b ^ key_byte for b in plaintext)
+        result = json.loads(xor_analyze(ciphertext.hex()))
+        assert len(result["single_byte_results"]) > 0
+        assert result["single_byte_results"][0]["key_byte"] == "0x42"
+
+    def test_no_results_for_random(self):
+        import random
+
+        random.seed(42)
+        data = bytes(random.randint(0, 255) for _ in range(100))
+        result = json.loads(xor_analyze(data.hex()))
+        # May or may not have results, but should not crash
+        assert "single_byte_results" in result
+
+
+class TestXorAnalyzeKeyLength:
+    def test_ic_detects_key_length(self):
+        # Encrypt a long English text with a 5-byte key
+        plaintext = b"the quick brown fox jumps over the lazy dog " * 20
+        key = b"ABCDE"
+        ciphertext = bytes(p ^ key[i % len(key)] for i, p in enumerate(plaintext))
+        result = json.loads(xor_analyze(ciphertext.hex(), max_key_length=10))
+        # Key length 5 should be among the top candidates
+        ic_lengths = [c["length"] for c in result["key_length_candidates"]]
+        assert 5 in ic_lengths
+
+    def test_multi_byte_recovery(self):
+        plaintext = b"Attack at dawn. The enemy approaches from the north. " * 10
+        key = b"SEC"
+        ciphertext = bytes(p ^ key[i % len(key)] for i, p in enumerate(plaintext))
+        result = json.loads(xor_analyze(ciphertext.hex(), max_key_length=10))
+        # best_decryption should exist and contain recovered key
+        assert "best_decryption" in result
+
+
+class TestXorAnalyzeEdgeCases:
+    def test_empty_data_returns_error(self):
+        result = json.loads(xor_analyze(""))
+        assert "error" in result
+
+    def test_invalid_hex_returns_error(self):
+        result = json.loads(xor_analyze("ZZZZ"))
+        assert "error" in result
+
+    def test_returns_valid_json(self):
+        result = json.loads(xor_analyze("414243"))
+        assert "data_length" in result
+
+
+# ── crypto_sage_solve tests ─────────────────────────────────────────────────
+
+sage_solve = ctf_crypto.crypto_sage_solve.fn
+
+
+class TestSageSolve:
+    def test_sage_not_found(self):
+        from unittest.mock import patch
+
+        with patch("shutil.which", return_value=None):
+            result = json.loads(sage_solve("print(42)"))
+            assert "error" in result
+            assert "sage" in result["error"].lower()
+
+    def test_sage_runs_script(self):
+        from unittest.mock import patch
+
+        mock_result = {"stdout": "42\n", "stderr": "", "returncode": 0}
+        with patch("ctf_crypto.run_tool", return_value=mock_result):
+            with patch("shutil.which", return_value="/usr/bin/sage"):
+                result = json.loads(sage_solve("print(42)"))
+                assert result["stdout"] == "42\n"
+                assert result["returncode"] == 0
+
+    def test_sage_json_output(self):
+        from unittest.mock import patch
+
+        mock_result = {"stdout": '{"x": 5}', "stderr": "", "returncode": 0}
+        with patch("ctf_crypto.run_tool", return_value=mock_result):
+            with patch("shutil.which", return_value="/usr/bin/sage"):
+                result = json.loads(
+                    sage_solve('import json; print(json.dumps({"x": 5}))')
+                )
+                assert result["parsed"] == {"x": 5}
+
+    def test_sage_timeout_passed(self):
+        from unittest.mock import call, patch
+
+        mock_result = {"stdout": "", "stderr": "", "returncode": 0}
+        with patch("ctf_crypto.run_tool", return_value=mock_result) as mock_run:
+            with patch("shutil.which", return_value="/usr/bin/sage"):
+                sage_solve("print(1)", timeout=30)
+                args, kwargs = mock_run.call_args
+                assert kwargs.get("timeout") == 30 or (len(args) > 1 and args[1] == 30)
+
+    def test_returns_valid_json(self):
+        from unittest.mock import patch
+
+        mock_result = {"stdout": "ok\n", "stderr": "", "returncode": 0}
+        with patch("ctf_crypto.run_tool", return_value=mock_result):
+            with patch("shutil.which", return_value="/usr/bin/sage"):
+                json.loads(sage_solve("print('ok')"))
