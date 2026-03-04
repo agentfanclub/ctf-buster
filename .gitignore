@@ -1,0 +1,13 @@
+/target
+Cargo.lock
+PLAN.md
+.direnv/
+result
+
+# Credentials and test data
+.env
+*.cookie
+*.token
+test-workspace/
+
+.claude

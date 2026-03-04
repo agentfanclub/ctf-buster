@@ -1,0 +1,28 @@
+[package]
+name = "ctf-buster"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ctf"
+path = "src/main.rs"
+
+[dependencies]
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive", "env"] }
+colored = "3"
+dialoguer = "0.11"
+dirs = "6"
+indicatif = "0.17"
+keyring = "3"
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "cookies"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tabled = "0.17"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs"] }
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = { version = "2", features = ["serde"] }
