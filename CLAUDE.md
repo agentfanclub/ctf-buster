@@ -15,30 +15,63 @@ All servers communicate over MCP stdio transport.
 
 ## CTF Competition Workflow
 
-When working on a CTF competition, use this multi-agent strategy:
+When working on a CTF competition, use this multi-agent orchestration strategy.
 
 ### 1. Initial Recon
 
 ```
-ctf_sync(full=true)          # Fetch all challenges + descriptions
+ctf_sync(full=true)          # Fetch all challenges + descriptions + files
 ctf_workspace_status()       # See score, progress, categories
-ctf_challenges(unsolved=true) # List what's left
+ctf_challenges(unsolved=true) # List what's left to solve
 ```
 
-### 2. Parallel Challenge Solving
+### 2. Orchestration Loop
 
-Launch subagents to work multiple challenges simultaneously:
+The main agent acts as an **orchestrator** — it does NOT solve challenges directly.
+Instead it launches subagents and monitors progress:
 
-- **Per-category agents**: Spawn a subagent per category (crypto, pwn, web, forensics, misc)
-- **Per-challenge agents**: For large CTFs, one agent per challenge
-- Each agent should:
-  1. Read the challenge description via `ctf_challenge_detail`
-  2. Download files via `ctf_download_files`
-  3. Triage with the appropriate tool (`binary_triage`, `file_triage`, `crypto_identify`)
-  4. Solve using available tools + bash
-  5. Submit flag via `ctf_submit_flag`
+```
+while unsolved challenges remain:
+  1. ctf_challenges(unsolved=true)         # Get current unsolved list
+  2. Prioritize: easy/low-solve challenges first, then by category strength
+  3. Launch subagents (Task tool) for batches of challenges
+  4. Wait for results, collect flags
+  5. ctf_workspace_status()                # Check updated score/progress
+  6. Re-sync if needed: ctf_sync()         # Picks up newly solved status
+```
 
-### 3. Category-Specific Approaches
+Key orchestration rules:
+- **Always check `ctf_challenges(unsolved=true)` before launching new agents** — avoids
+  re-attempting challenges already solved by another subagent
+- **State is shared** — `ctf_submit_flag` writes to `.ctf-state.json` which tracks every
+  solve with timestamp, flag, and points. `ctf_workspace_status` reads this.
+- **Re-sync periodically** — `ctf_sync()` updates local state from the platform, catching
+  solves from other team members too
+- **Batch by difficulty** — start with "easy" tagged challenges, then "medium", then "hard"
+- **Time-box subagents** — if a challenge isn't progressing, move on and come back later
+
+### 3. Subagent Structure
+
+Each subagent receives a specific challenge (or small batch) to solve:
+
+```
+Subagent prompt pattern:
+  "Solve CTF challenge '{name}' (category: {category}, {points} pts).
+   Description: {description}
+   Files: {file_list}
+   Workspace: {workspace_path}
+
+   Steps:
+   1. Download files with ctf_download_files('{name}')
+   2. Triage with {appropriate_triage_tool}
+   3. Analyze and solve
+   4. Submit flag with ctf_submit_flag('{name}', 'flag{...}')
+   5. Report back: solved/unsolved/needs-help"
+```
+
+For parallel execution, launch multiple subagents in a single message using the Task tool.
+
+### 4. Category-Specific Approaches
 
 **Crypto challenges:**
 - `crypto_identify` to detect encoding/cipher type
@@ -71,9 +104,17 @@ Launch subagents to work multiple challenges simultaneously:
 - Use bash directly: curl, sqlmap, ffuf, nuclei, nikto, etc.
 - These tools work well from bash and don't need MCP wrapping
 
-### 4. Flag Submission
+### 5. Progress Tracking & Flag Submission
 
-Always submit via `ctf_submit_flag` to track solves in workspace state.
+- **Always submit via `ctf_submit_flag`** — this writes to `.ctf-state.json` with the flag,
+  points, and timestamp. Never submit flags manually via curl/bash.
+- **Check progress often** — `ctf_workspace_status()` gives a live scoreboard-style view
+  of solved/unsolved per category
+- **`ctf_challenges(solved=true)`** — review what's been solved to avoid duplicating work
+- **Flags are stored** — `.ctf-state.json` keeps every flag for later reference. The
+  `mark_solved` function records challenge ID, name, points, flag, and solve timestamp.
+- **Platform sync** — `ctf_sync()` also detects solves made outside ctf-buster (e.g. by
+  teammates) via the `solved_by_me` field from the API
 
 ## Development
 

@@ -43,9 +43,24 @@
             ];
           };
 
-          # Python environment matching ~/.nixos-config/modules/programs/python.nix
-          python3 = pkgs.python3.override {
+          # Python 3.13 — angr 9.2.193 needs setuptools-rust (broken in nixpkgs), and
+          # pycparser 3.00 breaks pyvex (removed CLexer.filename setter). Fix both:
+          # pin angr stack to 9.2.154 and pycparser to 2.22 (last 2.x release).
+          python313 = pkgs.python313.override {
             packageOverrides = _pyfinal: pyprev: {
+              pycparser = pyprev.pycparser.overridePythonAttrs {
+                version = "2.22";
+                src = pkgs.fetchFromGitHub {
+                  owner = "eliben";
+                  repo = "pycparser";
+                  tag = "release_v2.22";
+                  hash = "sha256-RY0xQ4Mj8IfYAcypZQx4lDBmcgzYqtM4ARm9NSccBgA=";
+                };
+                doCheck = false;
+              };
+              cffi = pyprev.cffi.overridePythonAttrs {
+                doCheck = false;
+              };
               angr = pyprev.angr.overridePythonAttrs {
                 version = "9.2.154";
                 src = pkgs.fetchFromGitHub {
@@ -54,7 +69,6 @@
                   tag = "v9.2.154";
                   hash = "sha256-aOgZXHk6GTWZAEraZQahEXUYs8LWAWv1n9GfX+2XTPU=";
                 };
-                pythonImportsCheck = [ ];
                 doCheck = false;
               };
               ailment = pyprev.ailment.overridePythonAttrs {
@@ -78,7 +92,7 @@
             };
           };
 
-          pythonEnv = python3.withPackages (
+          pythonEnv = python313.withPackages (
             ps: with ps; [
               # Security / CTF
               angr
