@@ -1,14 +1,16 @@
 # CTF-Buster
 
-AI-powered CTF competition toolkit. Rust CLI + 4 MCP servers (28 tools total).
+AI-powered CTF competition toolkit. Rust CLI + 6 MCP servers (41 tools total).
 
 ## Architecture
 
 ```
-ctf-buster (Rust)     — 9 tools: platform interaction (CTFd/rCTF)
-ctf-crypto (Python)   — 6 tools: encoding chains, RSA attacks, constraint solving
-ctf-binary (Python)   — 8 tools: triage, disassembly, ROP, pwntools, angr
+ctf-buster (Rust)      — 11 tools: platform interaction (CTFd/rCTF), queue management
+ctf-crypto (Python)    — 6 tools: encoding chains, RSA attacks, constraint solving
+ctf-binary (Python)    — 8 tools: triage, disassembly, ROP, pwntools, angr
 ctf-forensics (Python) — 5 tools: file analysis, stego, extraction, entropy
+ctf-gdb (Python)       — 5 tools: GDB dynamic analysis, breakpoints, input tracing
+ctf-re (Python)        — 6 tools: decompilation, xrefs, CFG, function analysis
 ```
 
 All servers communicate over MCP stdio transport.
@@ -159,6 +161,16 @@ For parallel execution, launch multiple subagents in a single message using the 
 **Binary/Pwn challenges:**
 - `binary_triage` first — get checksec, imports, dangerous functions, architecture
 - `disassemble` to read key functions
+- `r2_decompile` for pseudocode (r2ghidra/r2dec fallback chain)
+- `r2_functions` to list all functions with sizes and call targets
+- `r2_xrefs` to trace call graphs and cross-references
+- `r2_cfg` for control flow graph analysis
+- `r2_strings_xrefs` to find which functions reference interesting strings
+- `gdb_break_inspect` to examine registers/stack/memory at breakpoints
+- `gdb_trace_input` to find buffer overflow offsets (cyclic pattern + crash analysis)
+- `gdb_memory_dump` to read memory at specific addresses during execution
+- `gdb_checksec_runtime` for runtime security info (ASLR, libc base, GOT, symbols)
+- `gdb_run` for general GDB command execution
 - `angr_analyze` for automatic solving of simple stack-based challenges:
   - `auto` mode: finds inputs producing flag-like output
   - `find_addr` mode: finds inputs reaching a specific address
@@ -167,7 +179,15 @@ For parallel execution, launch multiple subagents in a single message using the 
 - `pattern_offset` to find buffer overflow offsets
 - `pwntools_template` to generate exploit scripts
 - `shellcode_generate` for shellcode payloads
-- Use bash + pwntools/gdb for interactive exploitation
+
+**Reverse engineering challenges:**
+- `r2_functions` to get an overview of all functions
+- `r2_decompile` for pseudocode of key functions
+- `r2_xrefs` to trace call graphs (who calls what)
+- `r2_strings_xrefs` to find functions referencing flag/password/key strings
+- `r2_cfg` to analyze control flow and branch conditions
+- `r2_diff` to compare patched vs original binaries
+- `gdb_break_inspect` to validate static analysis with runtime state
 
 **Forensics/Stego challenges:**
 - `file_triage` first — get file type, metadata, embedded data, entropy
@@ -208,7 +228,7 @@ nix develop                                    # Enter devShell
 cargo build --release                          # Build Rust CLI
 cargo test                                     # Run Rust tests (94 tests)
 cargo clippy -- -W clippy::all                 # Lint Rust
-python3 -m pytest tools/tests/                 # Run Python tests (222 tests)
+python3 -m pytest tools/tests/                 # Run Python tests (309 tests)
 python3 -m pytest tools/tests/ --cov=tools     # Python coverage
 cargo tarpaulin                                # Rust coverage
 ```
@@ -226,6 +246,8 @@ tools/                  Python MCP servers
   ctf_crypto.py         Crypto & encoding server
   ctf_binary.py         Binary analysis server
   ctf_forensics.py      Forensics & stego server
+  ctf_gdb.py            GDB dynamic analysis server
+  ctf_re.py             Reverse engineering server
   lib/                  Shared subprocess utilities
   tests/                Python test suite
 docs/                   Extended documentation
@@ -257,6 +279,8 @@ claude mcp add -s user ctf-buster -- /path/to/target/release/ctf mcp --workspace
 claude mcp add -s user ctf-crypto -- python3 /path/to/tools/ctf_crypto.py
 claude mcp add -s user ctf-binary -- python3 /path/to/tools/ctf_binary.py
 claude mcp add -s user ctf-forensics -- python3 /path/to/tools/ctf_forensics.py
+claude mcp add -s user ctf-gdb -- python3 /path/to/tools/ctf_gdb.py
+claude mcp add -s user ctf-re -- python3 /path/to/tools/ctf_re.py
 ```
 
 **Via `.mcp.json` (recommended):**
@@ -279,6 +303,14 @@ claude mcp add -s user ctf-forensics -- python3 /path/to/tools/ctf_forensics.py
     "ctf-forensics": {
       "command": "python3",
       "args": ["./tools/ctf_forensics.py"]
+    },
+    "ctf-gdb": {
+      "command": "python3",
+      "args": ["./tools/ctf_gdb.py"]
+    },
+    "ctf-re": {
+      "command": "python3",
+      "args": ["./tools/ctf_re.py"]
     }
   }
 }

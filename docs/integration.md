@@ -25,6 +25,14 @@ Place in your workspace root:
     "ctf-forensics": {
       "command": "python3",
       "args": ["./tools/ctf_forensics.py"]
+    },
+    "ctf-gdb": {
+      "command": "python3",
+      "args": ["./tools/ctf_gdb.py"]
+    },
+    "ctf-re": {
+      "command": "python3",
+      "args": ["./tools/ctf_re.py"]
     }
   }
 }
@@ -37,6 +45,8 @@ claude mcp add -s user ctf-buster -- /path/to/target/release/ctf mcp --workspace
 claude mcp add -s user ctf-crypto -- python3 /path/to/tools/ctf_crypto.py
 claude mcp add -s user ctf-binary -- python3 /path/to/tools/ctf_binary.py
 claude mcp add -s user ctf-forensics -- python3 /path/to/tools/ctf_forensics.py
+claude mcp add -s user ctf-gdb -- python3 /path/to/tools/ctf_gdb.py
+claude mcp add -s user ctf-re -- python3 /path/to/tools/ctf_re.py
 ```
 
 ## Typical Workflow

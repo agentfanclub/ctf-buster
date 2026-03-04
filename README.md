@@ -12,7 +12,7 @@ workspace.
   track scores on CTFd and rCTF with automatic platform detection.
 - **Workspace management** -- initialize per-competition workspaces with
   scaffolded directories, solve templates, and notes files.
-- **4 MCP servers / 28 tools** -- expose every capability over MCP so AI agents
+- **6 MCP servers / 41 tools** -- expose every capability over MCP so AI agents
   can call them directly.
 - **160+ security tools** -- the Nix dev shell bundles a curated set of
   security CLI tools (radare2, Ghidra, binwalk, hashcat, pwntools, angr, z3,
@@ -25,20 +25,20 @@ workspace.
 ```
                         Claude Code / AI Agent
                                 |
-          +-----------+---------+---------+-----------+
-          |           |                   |           |
-   ctf-buster     ctf-crypto      ctf-binary    ctf-forensics
-    (Rust)        (Python)         (Python)       (Python)
-    9 tools       6 tools          8 tools        5 tools
-      |               |               |               |
-   CTFd/rCTF     sympy, z3       radare2, pwn    binwalk, zsteg
-   platforms     cryptography    ROPgadget        steghide, PIL
+    +--------+--------+---------+---------+---------+--------+
+    |        |        |                   |         |        |
+ctf-buster ctf-crypto ctf-binary  ctf-forensics  ctf-gdb  ctf-re
+  (Rust)   (Python)   (Python)     (Python)     (Python) (Python)
+ 11 tools  6 tools    8 tools      5 tools      5 tools  6 tools
+    |          |          |            |            |        |
+ CTFd/rCTF  sympy,z3  radare2,pwn  binwalk,    GDB      radare2
+ platforms  crypto    ROPgadget    zsteg,PIL   batch     r2ghidra
 ```
 
-All four servers communicate over **stdio** using the Model Context Protocol.
-The Rust server (`ctf-buster`) handles platform interaction and workspace
-management. The three Python servers (`ctf-crypto`, `ctf-binary`,
-`ctf-forensics`) handle domain-specific analysis, built on the
+All six servers communicate over **stdio** using the Model Context Protocol.
+The Rust server (`ctf-buster`) handles platform interaction, workspace
+management, and orchestration queuing. The five Python servers handle
+domain-specific analysis, built on the
 [FastMCP](https://github.com/jlowin/fastmcp) framework.
 
 ## Quick Start
@@ -72,7 +72,7 @@ ctf submit "challenge-name" "flag{...}"
 |----------|-------------|
 | [Architecture](docs/architecture.md) | System design, module structure, platform abstraction |
 | [CLI Reference](docs/cli-reference.md) | All CLI commands with examples |
-| [MCP Tools](docs/mcp-tools.md) | All 28 tools across 4 MCP servers |
+| [MCP Tools](docs/mcp-tools.md) | All 41 tools across 6 MCP servers |
 | [Configuration](docs/configuration.md) | `.ctf.toml`, authentication, scaffold templates |
 | [Integration](docs/integration.md) | Claude Code setup and `.mcp.json` |
 | [Security Tools](docs/security-tools.md) | 160+ tools available in the Nix dev shell |
@@ -84,7 +84,7 @@ nix develop                        # Enter dev shell
 cargo build --release              # Build Rust CLI
 cargo test                         # Run Rust tests (94 tests)
 cargo clippy -- -W clippy::all     # Lint Rust
-pytest tools/                      # Run Python tests (222 tests)
+pytest tools/tests/                # Run Python tests (309 tests)
 ```
 
 ## Platform Support

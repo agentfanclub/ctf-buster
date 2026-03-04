@@ -1,10 +1,10 @@
 # MCP Tools Reference
 
-CTF-Buster provides 28 tools across 4 MCP servers.
+CTF-Buster provides 41 tools across 6 MCP servers.
 
-## ctf-buster (Rust) -- 9 tools
+## ctf-buster (Rust) -- 11 tools
 
-Platform interaction and workspace management.
+Platform interaction, workspace management, and orchestration.
 
 | Tool | Description |
 |------|-------------|
@@ -18,6 +18,8 @@ Platform interaction and workspace management.
 | `ctf_workspace_status` | Get workspace status -- team info, score, challenge counts per category, solve progress. |
 | `ctf_unlock_hint` | Unlock a hint for a challenge. Warns when hints cost points. |
 | `ctf_notifications` | Get competition notifications/announcements from the platform. |
+| `ctf_queue_status` | Get the challenge priority queue -- shows what to solve next, what's in progress, and what failed. Persists across agent restarts. |
+| `ctf_queue_update` | Update the challenge queue -- set priorities, mark challenges as in-progress, completed, or failed. Actions: `set_queue`, `start`, `complete`, `fail`, `clear`. |
 
 ## ctf-crypto (Python) -- 6 tools
 
@@ -57,3 +59,28 @@ File forensics and steganography.
 | `extract_embedded` | Extract embedded files using binwalk and foremost. Returns extracted file types, sizes, and content previews. |
 | `entropy_analysis` | Block-level Shannon entropy calculation to detect encrypted/compressed regions and anomalous boundaries. |
 | `image_analysis` | Deep image inspection -- channel statistics, LSB ratio analysis, palette examination, histogram anomaly detection. Optional LSB data extraction. |
+
+## ctf-gdb (Python) -- 5 tools
+
+Dynamic binary analysis using GDB batch mode.
+
+| Tool | Description |
+|------|-------------|
+| `gdb_run` | Run a binary under GDB with a sequence of commands. General-purpose GDB execution with structured output parsing. |
+| `gdb_break_inspect` | Set breakpoints, run to them, dump registers, stack, memory, and backtrace at each breakpoint. |
+| `gdb_trace_input` | Trace where user input lands in memory. Generates cyclic patterns, catches SIGSEGV, and reports pattern offsets for buffer overflow development. |
+| `gdb_memory_dump` | Read memory at specific addresses at a given execution point. Returns hex dump and ASCII interpretation. |
+| `gdb_checksec_runtime` | Get runtime security info -- actual ASLR state, libc base address, process mappings, GOT entries, and resolved symbol addresses. |
+
+## ctf-re (Python) -- 6 tools
+
+Deep static analysis using radare2.
+
+| Tool | Description |
+|------|-------------|
+| `r2_functions` | List all functions with addresses, sizes, basic block counts, and call targets after full analysis. |
+| `r2_xrefs` | Find cross-references to/from a function or address. Shows call graph relationships (who calls what). |
+| `r2_decompile` | Decompile a function to pseudocode. Tries r2ghidra (pdg), r2dec (pdd), then falls back to annotated disassembly. |
+| `r2_strings_xrefs` | List strings with which functions reference them. Optional regex filter (e.g., "flag\|password\|key"). |
+| `r2_cfg` | Extract control flow graph for a function -- basic blocks, instructions, branch targets, and conditions. |
+| `r2_diff` | Compare two binaries to find byte-level differences. Useful for patch analysis challenges. |
