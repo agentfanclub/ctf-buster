@@ -375,11 +375,7 @@ mod tests {
   fn scaffold_creates_files_when_enabled() {
     let dir = TempDir::new().unwrap();
     let c = make_challenge("Test", "Web");
-    let config = ScaffoldConfig {
-      create_solve_file: true,
-      create_notes_file: true,
-      ..ScaffoldConfig::default()
-    };
+    let config = ScaffoldConfig { create_solve_file: true, create_notes_file: true, ..ScaffoldConfig::default() };
 
     let created = scaffold_challenge(dir.path(), &c, &config).unwrap();
     assert!(created);

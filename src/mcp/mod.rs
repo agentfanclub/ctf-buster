@@ -36,10 +36,7 @@ impl McpServer {
   async fn ctf_whoami(&self) -> Result<CallToolResult, McpError> {
     let info = self.platform.whoami().await.map_err(to_mcp_error)?;
     let rank = info.rank.map(|r| format!("#{r}")).unwrap_or("-".into());
-    Ok(CallToolResult::success(vec![Content::text(format!(
-      "{} | Score: {} | Rank: {}",
-      info.name, info.score, rank,
-    ))]))
+    Ok(CallToolResult::success(vec![Content::text(format!("{} | Score: {} | Rank: {}", info.name, info.score, rank,))]))
   }
 
   #[tool(
@@ -281,11 +278,7 @@ impl McpServer {
       count += 1;
     }
 
-    Ok(CallToolResult::success(vec![Content::text(format!(
-      "Downloaded {} file(s) to {}",
-      count,
-      dist_dir.display(),
-    ))]))
+    Ok(CallToolResult::success(vec![Content::text(format!("Downloaded {} file(s) to {}", count, dist_dir.display(),))]))
   }
 
   #[tool(description = "Get workspace status — team info, score, challenge counts per category, solve progress")]
@@ -311,11 +304,11 @@ impl McpServer {
     let mut lines = Vec::new();
     lines.push(format!(
       "Team: {} | Score: {} | Rank: {}",
-      info.name, info.score, info.rank.map(|r| r.to_string()).unwrap_or("-".into()),
+      info.name,
+      info.score,
+      info.rank.map(|r| r.to_string()).unwrap_or("-".into()),
     ));
-    lines.push(format!(
-      "Challenges: {solved}/{total} solved ({solved_points}/{total_points} pts)",
-    ));
+    lines.push(format!("Challenges: {solved}/{total} solved ({solved_points}/{total_points} pts)",));
     for (cat, (s, t, pts)) in &categories {
       lines.push(format!("  {cat}: {s}/{t} ({pts} pts)"));
     }
