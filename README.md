@@ -84,9 +84,9 @@ ctf submit "challenge-name" "flag{...}"
 ```bash
 nix develop                        # Enter dev shell
 cargo build --release              # Build Rust CLI
-cargo test                         # Run Rust tests (94 tests)
+cargo test                         # Run Rust tests (163 tests)
 cargo clippy -- -W clippy::all     # Lint Rust
-pytest tools/tests/                # Run Python tests (309 tests)
+pytest tools/tests/                # Run Python tests (405 tests)
 ```
 
 ## Platform Support

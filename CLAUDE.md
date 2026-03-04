@@ -299,9 +299,9 @@ orchestrator works. The dashboard polls `.ctf-state.json` every 2 seconds and sh
 ```bash
 nix develop                                    # Enter devShell
 cargo build --release                          # Build Rust CLI
-cargo test                                     # Run Rust tests (137 tests)
+cargo test                                     # Run Rust tests (163 tests)
 cargo clippy -- -W clippy::all                 # Lint Rust
-python3 -m pytest tools/tests/                 # Run Python tests (378 tests)
+python3 -m pytest tools/tests/                 # Run Python tests (405 tests)
 python3 -m pytest tools/tests/ --cov=tools     # Python coverage
 cargo tarpaulin                                # Rust coverage
 ```
