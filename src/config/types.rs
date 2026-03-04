@@ -28,24 +28,20 @@ pub struct WorkspaceSection {
 pub struct ScaffoldConfig {
   #[serde(default = "default_template")]
   pub template: String,
-  #[serde(default = "default_true")]
+  #[serde(default)]
   pub create_solve_file: bool,
-  #[serde(default = "default_true")]
+  #[serde(default)]
   pub create_notes_file: bool,
 }
 
 impl Default for ScaffoldConfig {
   fn default() -> Self {
-    Self { template: default_template(), create_solve_file: true, create_notes_file: true }
+    Self { template: default_template(), create_solve_file: false, create_notes_file: false }
   }
 }
 
 fn default_template() -> String {
   "{category}/{name}".to_string()
-}
-
-fn default_true() -> bool {
-  true
 }
 
 #[cfg(test)]
@@ -67,8 +63,8 @@ mod tests {
     assert_eq!(config.workspace.name, "test-ctf");
     // scaffold should use defaults
     assert_eq!(config.scaffold.template, "{category}/{name}");
-    assert!(config.scaffold.create_solve_file);
-    assert!(config.scaffold.create_notes_file);
+    assert!(!config.scaffold.create_solve_file);
+    assert!(!config.scaffold.create_notes_file);
   }
 
   #[test]
@@ -96,8 +92,8 @@ mod tests {
   fn scaffold_config_defaults() {
     let config = ScaffoldConfig::default();
     assert_eq!(config.template, "{category}/{name}");
-    assert!(config.create_solve_file);
-    assert!(config.create_notes_file);
+    assert!(!config.create_solve_file);
+    assert!(!config.create_notes_file);
   }
 
   #[test]

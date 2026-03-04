@@ -35,8 +35,11 @@ impl McpServer {
   #[tool(description = "Get info about the authenticated team/user — name, score, rank")]
   async fn ctf_whoami(&self) -> Result<CallToolResult, McpError> {
     let info = self.platform.whoami().await.map_err(to_mcp_error)?;
-    let json = serde_json::to_string_pretty(&info).map_err(to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    let rank = info.rank.map(|r| format!("#{r}")).unwrap_or("-".into());
+    Ok(CallToolResult::success(vec![Content::text(format!(
+      "{} | Score: {} | Rank: {}",
+      info.name, info.score, rank,
+    ))]))
   }
 
   #[tool(
@@ -63,25 +66,20 @@ impl McpServer {
 
     challenges.sort_by(|a, b| a.category.cmp(&b.category).then(a.name.cmp(&b.name)));
 
-    // Return slim listing to avoid bloating orchestrator context with descriptions/hints/URLs
-    let slim: Vec<_> = challenges
-      .iter()
-      .map(|c| {
-        serde_json::json!({
-          "id": c.id,
-          "name": c.name,
-          "category": c.category,
-          "value": c.value,
-          "solves": c.solves,
-          "solved_by_me": c.solved_by_me,
-          "files": c.files.len(),
-          "hints": c.hints.len(),
-          "tags": c.tags,
-        })
-      })
-      .collect();
-    let json = serde_json::to_string_pretty(&slim).map_err(to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    // Return compact text table to avoid bloating orchestrator context
+    let mut lines = Vec::new();
+    lines.push(format!("{} challenges:", challenges.len()));
+    let mut current_cat = String::new();
+    for c in &challenges {
+      if c.category != current_cat {
+        current_cat = c.category.clone();
+        lines.push(format!("\n[{}]", current_cat));
+      }
+      let solved = if c.solved_by_me { " *" } else { "" };
+      let files = if c.files.is_empty() { String::new() } else { format!(" {}f", c.files.len()) };
+      lines.push(format!("  {} ({}pts, {}s{}){}", c.name, c.value, c.solves, files, solved));
+    }
+    Ok(CallToolResult::success(vec![Content::text(lines.join("\n"))]))
   }
 
   #[tool(
@@ -131,8 +129,14 @@ impl McpServer {
   #[tool(description = "Show the competition scoreboard with team rankings")]
   async fn ctf_scoreboard(&self, Parameters(params): Parameters<ScoreboardParams>) -> Result<CallToolResult, McpError> {
     let entries = self.platform.scoreboard(params.limit).await.map_err(to_mcp_error)?;
-    let json = serde_json::to_string_pretty(&entries).map_err(to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    let mut lines = Vec::new();
+    for (i, e) in entries.iter().enumerate() {
+      lines.push(format!("{}. {} — {} pts", i + 1, e.name, e.score));
+    }
+    if lines.is_empty() {
+      lines.push("No scoreboard entries.".into());
+    }
+    Ok(CallToolResult::success(vec![Content::text(lines.join("\n"))]))
   }
 
   #[tool(
@@ -269,16 +273,19 @@ impl McpServer {
     let dist_dir = challenge_dir.join("dist");
     std::fs::create_dir_all(&dist_dir).map_err(to_mcp_error)?;
 
-    let mut downloaded = Vec::new();
+    let mut count = 0u32;
     for file in &challenge.files {
       let safe_name = scaffold::sanitize_filename(&file.name);
       let dest = dist_dir.join(&safe_name);
       self.platform.download_file(file, &dest).await.map_err(to_mcp_error)?;
-      downloaded.push(dest.display().to_string());
+      count += 1;
     }
 
-    let json = serde_json::to_string_pretty(&downloaded).map_err(to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    Ok(CallToolResult::success(vec![Content::text(format!(
+      "Downloaded {} file(s) to {}",
+      count,
+      dist_dir.display(),
+    ))]))
   }
 
   #[tool(description = "Get workspace status — team info, score, challenge counts per category, solve progress")]
@@ -301,28 +308,18 @@ impl McpServer {
       }
     }
 
-    let status = serde_json::json!({
-      "team": info.name,
-      "score": info.score,
-      "rank": info.rank,
-      "challenges": {
-        "total": total,
-        "solved": solved,
-        "total_points": total_points,
-        "solved_points": solved_points,
-      },
-      "categories": categories.iter().map(|(cat, (s, t, pts))| {
-        serde_json::json!({
-          "name": cat,
-          "solved": s,
-          "total": t,
-          "points": pts,
-        })
-      }).collect::<Vec<_>>(),
-    });
-
-    let json = serde_json::to_string_pretty(&status).map_err(to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    let mut lines = Vec::new();
+    lines.push(format!(
+      "Team: {} | Score: {} | Rank: {}",
+      info.name, info.score, info.rank.map(|r| r.to_string()).unwrap_or("-".into()),
+    ));
+    lines.push(format!(
+      "Challenges: {solved}/{total} solved ({solved_points}/{total_points} pts)",
+    ));
+    for (cat, (s, t, pts)) in &categories {
+      lines.push(format!("  {cat}: {s}/{t} ({pts} pts)"));
+    }
+    Ok(CallToolResult::success(vec![Content::text(lines.join("\n"))]))
   }
 
   #[tool(
@@ -365,8 +362,37 @@ impl McpServer {
   )]
   async fn ctf_queue_status(&self) -> Result<CallToolResult, McpError> {
     let orch = state::load_orchestration(&self.workspace_root).map_err(to_mcp_error)?;
-    let json = serde_json::to_string_pretty(&orch).map_err(to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+
+    let mut lines = Vec::new();
+    lines.push(format!(
+      "Queue: {} | In-progress: {} | Failed: {}",
+      orch.queue.len(),
+      orch.in_progress.len(),
+      orch.failed.len(),
+    ));
+
+    if !orch.in_progress.is_empty() {
+      lines.push(format!("\nIn-progress: {}", orch.in_progress.join(", ")));
+    }
+
+    if !orch.queue.is_empty() {
+      lines.push("\nQueue (top 15):".into());
+      for q in orch.queue.iter().take(15) {
+        lines.push(format!("  {} [{}] p={} {}pts", q.name, q.category, q.priority, q.points));
+      }
+      if orch.queue.len() > 15 {
+        lines.push(format!("  ...and {} more", orch.queue.len() - 15));
+      }
+    }
+
+    if !orch.failed.is_empty() {
+      lines.push("\nFailed:".into());
+      for f in &orch.failed {
+        lines.push(format!("  {} [{}]: {}", f.name, f.category, f.notes));
+      }
+    }
+
+    Ok(CallToolResult::success(vec![Content::text(lines.join("\n"))]))
   }
 
   #[tool(
@@ -472,8 +498,13 @@ impl McpServer {
     state::update_orchestration(&self.workspace_root, orch).map_err(to_mcp_error)?;
 
     let updated = state::load_orchestration(&self.workspace_root).map_err(to_mcp_error)?;
-    let json = serde_json::to_string_pretty(&updated).map_err(to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    let summary = format!(
+      "OK. Queue: {}, in_progress: {}, failed: {}.",
+      updated.queue.len(),
+      updated.in_progress.len(),
+      updated.failed.len(),
+    );
+    Ok(CallToolResult::success(vec![Content::text(summary)]))
   }
 
   #[tool(description = "Get competition notifications/announcements from the CTF platform")]
@@ -483,8 +514,15 @@ impl McpServer {
     // Update cached state
     let _ = state::update_notifications(&self.workspace_root, &notifications);
 
-    let json = serde_json::to_string_pretty(&notifications).map_err(to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    if notifications.is_empty() {
+      return Ok(CallToolResult::success(vec![Content::text("No notifications.")]));
+    }
+    let mut lines = Vec::new();
+    lines.push(format!("{} notification(s):", notifications.len()));
+    for n in &notifications {
+      lines.push(format!("\n[{}] {}\n{}", n.date, n.title, n.content));
+    }
+    Ok(CallToolResult::success(vec![Content::text(lines.join("\n"))]))
   }
 
   #[tool(
@@ -804,26 +842,17 @@ Use forensics_file_triage on any downloaded files to determine content type, the
       std::fs::create_dir_all(&challenge_dir).map_err(to_mcp_error)?;
       std::fs::write(&prompt_path, &prompt).map_err(to_mcp_error)?;
 
-      prompts.push(serde_json::json!({
-        "challenge": target.name,
-        "category": target.category,
-        "points": target.points,
-        "priority": target.priority,
-        "recommended_model": recommended_model,
-        "subagent_type": "general-purpose",
-        "is_retry": is_retry,
-        "prompt_file": prompt_path,
-      }));
+      prompts.push((target.name.clone(), recommended_model, is_retry, prompt_path));
     }
 
-    let result = serde_json::json!({
-      "count": prompts.len(),
-      "prompts": prompts,
-      "usage": "For each prompt: read the prompt_file content, then launch a subagent: Task(description='Solve <name>', prompt=<content of prompt_file>, model=recommended_model, subagent_type='general-purpose'). Launch multiple in parallel for maximum throughput.",
-    });
-
-    let json = serde_json::to_string_pretty(&result).map_err(to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    // Return compact text table — orchestrator already knows the workflow
+    let mut lines = Vec::new();
+    lines.push(format!("{} prompt(s) generated:", prompts.len()));
+    for (name, model, is_retry, path) in &prompts {
+      let retry_tag = if *is_retry { " [RETRY]" } else { "" };
+      lines.push(format!("  {name}{retry_tag} model={model} prompt_file={path}"));
+    }
+    Ok(CallToolResult::success(vec![Content::text(lines.join("\n"))]))
   }
 
   #[tool(

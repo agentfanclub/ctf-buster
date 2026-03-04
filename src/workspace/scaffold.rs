@@ -357,10 +357,29 @@ mod tests {
   }
 
   #[test]
-  fn scaffold_creates_directory_and_files() {
+  fn scaffold_creates_directory_without_files_by_default() {
     let dir = TempDir::new().unwrap();
     let c = make_challenge("Test", "Web");
     let config = ScaffoldConfig::default();
+
+    let created = scaffold_challenge(dir.path(), &c, &config).unwrap();
+    assert!(created);
+
+    let challenge_path = dir.path().join("web/test");
+    assert!(challenge_path.exists());
+    assert!(!challenge_path.join("solve.py").exists());
+    assert!(!challenge_path.join("notes.md").exists());
+  }
+
+  #[test]
+  fn scaffold_creates_files_when_enabled() {
+    let dir = TempDir::new().unwrap();
+    let c = make_challenge("Test", "Web");
+    let config = ScaffoldConfig {
+      create_solve_file: true,
+      create_notes_file: true,
+      ..ScaffoldConfig::default()
+    };
 
     let created = scaffold_challenge(dir.path(), &c, &config).unwrap();
     assert!(created);
