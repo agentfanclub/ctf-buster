@@ -132,7 +132,7 @@ async fn run(cli: Cli) -> error::Result<()> {
       cli::workspace::handle_files(&root, &id_or_name).await?;
     }
 
-    Command::Mcp { workspace } => {
+    Command::Mcp { workspace, token } => {
       use rmcp::ServiceExt;
       use std::sync::Arc;
 
@@ -145,8 +145,12 @@ async fn run(cli: Cli) -> error::Result<()> {
       };
 
       let ws_config = config::load_workspace_config(&root)?;
-      let token = cli::auth::get_token(&ws_config.workspace.name)?;
-      let plat = platform::create_platform(&ws_config.platform, &token).await?;
+      let resolved_token = cli::auth::get_token_with_config(
+        &ws_config.workspace.name,
+        ws_config.platform.token.as_deref(),
+        token.as_deref(),
+      )?;
+      let plat = platform::create_platform(&ws_config.platform, &resolved_token).await?;
       let plat: Arc<dyn platform::Platform> = Arc::from(plat);
 
       let server = mcp::McpServer::new(plat, root, ws_config);
@@ -169,7 +173,11 @@ async fn load_platform() -> error::Result<(Box<dyn platform::Platform>, std::pat
   let cwd = std::env::current_dir()?;
   let root = config::find_workspace_root(&cwd).ok_or(error::Error::NotInWorkspace)?;
   let ws_config = config::load_workspace_config(&root)?;
-  let token = cli::auth::get_token(&ws_config.workspace.name)?;
+  let token = cli::auth::get_token_with_config(
+    &ws_config.workspace.name,
+    ws_config.platform.token.as_deref(),
+    None,
+  )?;
   let plat = platform::create_platform(&ws_config.platform, &token).await?;
   Ok((plat, root))
 }

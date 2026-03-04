@@ -1,5 +1,6 @@
-"""Tests for ctf_forensics.py — pure-Python helper functions only (no external CLI tools)."""
+"""Tests for ctf_forensics.py — pure-Python helper functions and tool JSON output."""
 
+import json
 import math
 import os
 import sys
@@ -10,11 +11,19 @@ import pytest
 # Allow imports from the tools directory
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+# Access tool functions through FastMCP wrappers
+import ctf_forensics
 from ctf_forensics import (
     _calculate_entropy,
     _check_trailing_data,
     _entropy_interpretation,
 )
+
+file_triage = ctf_forensics.file_triage.fn
+stego_analyze = ctf_forensics.stego_analyze.fn
+extract_embedded = ctf_forensics.extract_embedded.fn
+entropy_analysis = ctf_forensics.entropy_analysis.fn
+image_analysis = ctf_forensics.image_analysis.fn
 
 # ── _calculate_entropy tests ─────────────────────────────────────────────────
 
@@ -224,3 +233,367 @@ class TestCheckTrailingData:
         # Should handle gracefully (exception caught internally)
         result = _check_trailing_data("/tmp/nonexistent_file_xyz.bin", "image/png")
         assert result["found"] is False
+
+
+# ── file_triage tool tests ───────────────────────────────────────────────────
+
+
+class TestFileTriage:
+    def test_nonexistent_file(self):
+        result = json.loads(file_triage("/nonexistent/file/xyz"))
+        assert "error" in result
+
+    def test_text_file(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w") as f:
+            f.write("Hello world, testing file triage\n")
+            path = f.name
+        try:
+            result = json.loads(file_triage(path))
+            assert result["path"] == os.path.realpath(path)
+            assert "file_type" in result
+            assert "size" in result
+            assert result["size"] > 0
+        finally:
+            os.unlink(path)
+
+    def test_binary_file_with_strings(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(b"\x00" * 50 + b"flag{hidden_data}" + b"\x00" * 50)
+            path = f.name
+        try:
+            result = json.loads(file_triage(path))
+            assert "file_type" in result
+            assert "entropy" in result
+            assert result["entropy"] >= 0
+        finally:
+            os.unlink(path)
+
+    def test_returns_valid_json(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".dat") as f:
+            f.write(os.urandom(100))
+            path = f.name
+        try:
+            raw = file_triage(path)
+            parsed = json.loads(raw)
+            assert isinstance(parsed, dict)
+        finally:
+            os.unlink(path)
+
+    def test_entropy_present(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(os.urandom(1000))
+            path = f.name
+        try:
+            result = json.loads(file_triage(path))
+            assert "entropy" in result
+            assert result["entropy"] > 7.0  # random data should be high entropy
+        finally:
+            os.unlink(path)
+
+    def test_trailing_data_field(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(b"plain data")
+            path = f.name
+        try:
+            result = json.loads(file_triage(path))
+            assert "trailing_data" in result
+        finally:
+            os.unlink(path)
+
+
+# ── stego_analyze tool tests ─────────────────────────────────────────────────
+
+
+class TestStegoAnalyze:
+    def test_nonexistent_file(self):
+        result = json.loads(stego_analyze("/nonexistent/file/xyz"))
+        assert "error" in result
+
+    def test_returns_findings_list(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(b"not a real image")
+            path = f.name
+        try:
+            result = json.loads(stego_analyze(path))
+            assert "findings" in result
+            assert isinstance(result["findings"], list)
+        finally:
+            os.unlink(path)
+
+    def test_returns_mime_type(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(b"test data")
+            path = f.name
+        try:
+            result = json.loads(stego_analyze(path))
+            assert "mime_type" in result
+        finally:
+            os.unlink(path)
+
+
+# ── extract_embedded tool tests ──────────────────────────────────────────────
+
+
+class TestExtractEmbedded:
+    def test_nonexistent_file(self):
+        result = json.loads(extract_embedded("/nonexistent/file/xyz"))
+        assert "error" in result
+
+    def test_plain_file_no_extraction(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as f:
+            f.write(b"just plain text, nothing embedded")
+            path = f.name
+        try:
+            result = json.loads(extract_embedded(path))
+            assert "source" in result
+            assert "extracted_count" in result
+        finally:
+            os.unlink(path)
+
+    def test_returns_valid_json(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(b"\x00" * 100)
+            path = f.name
+        try:
+            raw = extract_embedded(path)
+            parsed = json.loads(raw)
+            assert isinstance(parsed, dict)
+        finally:
+            os.unlink(path)
+
+
+# ── entropy_analysis tool tests ──────────────────────────────────────────────
+
+
+class TestEntropyAnalysis:
+    def test_nonexistent_file(self):
+        result = json.loads(entropy_analysis("/nonexistent/file/xyz"))
+        assert "error" in result
+
+    def test_uniform_random_data(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(os.urandom(10000))
+            path = f.name
+        try:
+            result = json.loads(entropy_analysis(path))
+            assert result["overall_entropy"] > 7.0
+            assert result["size"] == 10000
+            assert result["total_blocks"] > 0
+        finally:
+            os.unlink(path)
+
+    def test_low_entropy_data(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(b"\x00" * 10000)
+            path = f.name
+        try:
+            result = json.loads(entropy_analysis(path))
+            assert result["overall_entropy"] == 0.0
+            assert result["low_entropy_blocks"] > 0
+        finally:
+            os.unlink(path)
+
+    def test_custom_block_size(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(os.urandom(1000))
+            path = f.name
+        try:
+            result = json.loads(entropy_analysis(path, block_size=100))
+            assert result["block_size"] == 100
+            assert result["total_blocks"] == 10
+        finally:
+            os.unlink(path)
+
+    def test_anomaly_detection(self):
+        # Create file with sudden entropy change
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(b"\x00" * 4096)  # low entropy block
+            f.write(os.urandom(4096))  # high entropy block
+            path = f.name
+        try:
+            result = json.loads(entropy_analysis(path, block_size=4096))
+            assert len(result["anomalies"]) > 0
+            assert result["anomalies"][0]["entropy_change"] > 2.0
+        finally:
+            os.unlink(path)
+
+    def test_returns_valid_json(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(b"abc" * 100)
+            path = f.name
+        try:
+            raw = entropy_analysis(path)
+            parsed = json.loads(raw)
+            assert "overall_entropy" in parsed
+            assert "blocks" in parsed
+            assert "interpretation" in parsed
+        finally:
+            os.unlink(path)
+
+    def test_interpretation_field(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(os.urandom(5000))
+            path = f.name
+        try:
+            result = json.loads(entropy_analysis(path))
+            assert isinstance(result["interpretation"], str)
+            assert len(result["interpretation"]) > 0
+        finally:
+            os.unlink(path)
+
+
+# ── image_analysis tool tests ────────────────────────────────────────────────
+
+
+class TestImageAnalysis:
+    def test_nonexistent_file(self):
+        result = json.loads(image_analysis("/nonexistent/file/xyz"))
+        assert "error" in result
+
+    def test_non_image_file(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as f:
+            f.write(b"not an image")
+            path = f.name
+        try:
+            result = json.loads(image_analysis(path))
+            assert "error" in result
+        finally:
+            os.unlink(path)
+
+    def test_valid_png(self):
+        """Create a minimal valid PNG and analyze it."""
+        try:
+            from PIL import Image
+        except ImportError:
+            pytest.skip("PIL not available")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f:
+            path = f.name
+
+        img = Image.new("RGB", (10, 10), color=(255, 0, 0))
+        img.save(path)
+        try:
+            result = json.loads(image_analysis(path))
+            assert result["format"] == "PNG"
+            assert result["mode"] == "RGB"
+            assert result["size"]["width"] == 10
+            assert result["size"]["height"] == 10
+            assert "channels" in result
+            assert "red" in result["channels"]
+            assert "lsb_analysis" in result
+        finally:
+            os.unlink(path)
+
+    def test_lsb_extraction(self):
+        """Test LSB extraction on a simple image."""
+        try:
+            from PIL import Image
+        except ImportError:
+            pytest.skip("PIL not available")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f:
+            path = f.name
+
+        img = Image.new("RGB", (10, 10), color=(128, 64, 32))
+        img.save(path)
+        try:
+            result = json.loads(image_analysis(path, extract_lsb=True))
+            assert "lsb_extracted" in result
+            assert "hex" in result["lsb_extracted"]
+            assert "ascii" in result["lsb_extracted"]
+            assert result["lsb_extracted"]["total_bytes"] > 0
+        finally:
+            os.unlink(path)
+
+    def test_channel_statistics(self):
+        """Verify channel stats are computed correctly for a solid color."""
+        try:
+            from PIL import Image
+        except ImportError:
+            pytest.skip("PIL not available")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f:
+            path = f.name
+
+        # Solid green image
+        img = Image.new("RGB", (5, 5), color=(0, 200, 0))
+        img.save(path)
+        try:
+            result = json.loads(image_analysis(path))
+            channels = result["channels"]
+            assert channels["red"]["min"] == 0
+            assert channels["red"]["max"] == 0
+            assert channels["green"]["min"] == 200
+            assert channels["green"]["max"] == 200
+            assert channels["blue"]["min"] == 0
+            assert channels["blue"]["max"] == 0
+        finally:
+            os.unlink(path)
+
+    def test_rgba_image(self):
+        """Test RGBA image handling."""
+        try:
+            from PIL import Image
+        except ImportError:
+            pytest.skip("PIL not available")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f:
+            path = f.name
+
+        img = Image.new("RGBA", (5, 5), color=(255, 128, 64, 200))
+        img.save(path)
+        try:
+            result = json.loads(image_analysis(path))
+            assert result["mode"] == "RGBA"
+            assert "channels" in result
+        finally:
+            os.unlink(path)
+
+    def test_palette_image(self):
+        """Test palette (P mode) image."""
+        try:
+            from PIL import Image
+        except ImportError:
+            pytest.skip("PIL not available")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f:
+            path = f.name
+
+        img = Image.new("P", (5, 5))
+        img.save(path)
+        try:
+            result = json.loads(image_analysis(path))
+            assert "palette_entries" in result or result["mode"] == "P"
+        finally:
+            os.unlink(path)
+
+
+# ── JSON output validation ───────────────────────────────────────────────────
+
+
+class TestJsonOutput:
+    """Every tool must return valid JSON."""
+
+    def test_file_triage_json(self):
+        raw = file_triage("/dev/null")
+        json.loads(raw)
+
+    def test_stego_analyze_json(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(b"data")
+            path = f.name
+        try:
+            raw = stego_analyze(path)
+            json.loads(raw)
+        finally:
+            os.unlink(path)
+
+    def test_entropy_analysis_json(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+            f.write(b"data" * 100)
+            path = f.name
+        try:
+            raw = entropy_analysis(path)
+            json.loads(raw)
+        finally:
+            os.unlink(path)

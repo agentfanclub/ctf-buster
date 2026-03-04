@@ -275,7 +275,17 @@ impl Platform for CtfdPlatform {
       }
       "incorrect" => Ok(SubmitResult::Incorrect),
       "already_solved" => Ok(SubmitResult::AlreadySolved),
-      "ratelimited" => Ok(SubmitResult::RateLimited { retry_after: None }),
+      "ratelimited" => {
+        // Try to parse retry_after from the response message
+        let message = data
+          .get("message")
+          .and_then(|m| m.as_str())
+          .unwrap_or("");
+        let retry_after = message
+          .split_whitespace()
+          .find_map(|word| word.trim_end_matches(|c: char| !c.is_ascii_digit()).parse::<u64>().ok());
+        Ok(SubmitResult::RateLimited { retry_after })
+      }
       _ => Err(Error::Platform(format!("Unknown submit status: {status}"))),
     }
   }
@@ -331,6 +341,37 @@ impl Platform for CtfdPlatform {
     let bytes = resp.bytes().await?;
     tokio::fs::write(dest, &bytes).await?;
     Ok(())
+  }
+
+  async fn notifications(&self) -> Result<Vec<Notification>> {
+    let body = self.get("/notifications").await?;
+    let data = body
+      .get("data")
+      .ok_or_else(|| Error::Platform("Missing data field".into()))?;
+
+    let raw: Vec<serde_json::Value> = serde_json::from_value(data.clone())?;
+    let notifications = raw
+      .into_iter()
+      .map(|n| Notification {
+        id: n.get("id").and_then(|v| v.as_u64()).unwrap_or(0).to_string(),
+        title: n
+          .get("title")
+          .and_then(|v| v.as_str())
+          .unwrap_or("")
+          .to_string(),
+        content: n
+          .get("content")
+          .and_then(|v| v.as_str())
+          .unwrap_or("")
+          .to_string(),
+        date: n
+          .get("date")
+          .and_then(|v| v.as_str())
+          .unwrap_or("")
+          .to_string(),
+      })
+      .collect();
+    Ok(notifications)
   }
 
   async fn unlock_hint(&self, hint_id: &str) -> Result<Hint> {

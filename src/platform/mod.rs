@@ -21,6 +21,7 @@ pub trait Platform: Send + Sync {
   async fn scoreboard(&self, limit: Option<u32>) -> Result<Vec<ScoreboardEntry>>;
   async fn download_file(&self, file: &ChallengeFile, dest: &Path) -> Result<()>;
   async fn unlock_hint(&self, hint_id: &str) -> Result<Hint>;
+  async fn notifications(&self) -> Result<Vec<Notification>>;
 }
 
 pub async fn create_platform(

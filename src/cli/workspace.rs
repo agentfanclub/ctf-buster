@@ -37,6 +37,7 @@ pub async fn handle_init(
     platform: PlatformConfig {
       platform_type: platform_type.map(|s| s.to_string()),
       url,
+      token: None,
     },
     workspace: WorkspaceSection {
       name: name.to_string(),

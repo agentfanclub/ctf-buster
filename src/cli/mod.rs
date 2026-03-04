@@ -108,5 +108,8 @@ pub enum Command {
     /// Workspace directory (defaults to CTF_WORKSPACE env or auto-detected)
     #[arg(long, env = "CTF_WORKSPACE")]
     workspace: Option<PathBuf>,
+    /// API token (overrides CTF_TOKEN env var and config file)
+    #[arg(long, env = "CTF_TOKEN")]
+    token: Option<String>,
   },
 }

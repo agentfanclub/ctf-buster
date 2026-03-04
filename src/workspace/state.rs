@@ -15,6 +15,8 @@ pub struct WorkspaceState {
   pub last_sync: Option<DateTime<Utc>>,
   #[serde(default)]
   pub challenges: HashMap<String, ChallengeState>,
+  #[serde(default)]
+  pub notifications: Vec<CachedNotification>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,6 +52,14 @@ pub struct CachedHint {
 pub struct CachedFile {
   pub name: String,
   pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CachedNotification {
+  pub id: String,
+  pub title: String,
+  pub content: String,
+  pub date: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -262,6 +272,23 @@ pub fn mark_solved(
   write_state(workspace_root, &state)
 }
 
+pub fn update_notifications(
+  workspace_root: &Path,
+  notifications: &[crate::platform::types::Notification],
+) -> Result<()> {
+  let mut state = load_state(workspace_root)?;
+  state.notifications = notifications
+    .iter()
+    .map(|n| CachedNotification {
+      id: n.id.clone(),
+      title: n.title.clone(),
+      content: n.content.clone(),
+      date: n.date.clone(),
+    })
+    .collect();
+  write_state(workspace_root, &state)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -399,6 +426,163 @@ mod tests {
     assert_eq!(entry.files.as_ref().unwrap().len(), 1);
     assert_eq!(entry.tags.as_ref().unwrap(), &["easy"]);
     assert!(entry.details_fetched_at.is_some());
+  }
+
+  #[test]
+  fn update_notifications_stores_and_replaces() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let notifs = vec![
+      crate::platform::types::Notification {
+        id: "1".into(),
+        title: "Welcome".into(),
+        content: "Hello everyone!".into(),
+        date: "2026-01-01".into(),
+      },
+      crate::platform::types::Notification {
+        id: "2".into(),
+        title: "Hint Released".into(),
+        content: "Check the headers".into(),
+        date: "2026-01-02".into(),
+      },
+    ];
+    update_notifications(dir.path(), &notifs).unwrap();
+
+    let state = load_state(dir.path()).unwrap();
+    assert_eq!(state.notifications.len(), 2);
+    assert_eq!(state.notifications[0].title, "Welcome");
+    assert_eq!(state.notifications[1].content, "Check the headers");
+
+    // Replace with new notifications
+    let new_notifs = vec![crate::platform::types::Notification {
+      id: "3".into(),
+      title: "Flag Format".into(),
+      content: "flag{...}".into(),
+      date: "2026-01-03".into(),
+    }];
+    update_notifications(dir.path(), &new_notifs).unwrap();
+
+    let state = load_state(dir.path()).unwrap();
+    assert_eq!(state.notifications.len(), 1);
+    assert_eq!(state.notifications[0].id, "3");
+  }
+
+  #[test]
+  fn update_notifications_empty_list() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    let notifs = vec![crate::platform::types::Notification {
+      id: "1".into(),
+      title: "Test".into(),
+      content: "Content".into(),
+      date: "2026-01-01".into(),
+    }];
+    update_notifications(dir.path(), &notifs).unwrap();
+
+    // Clear with empty list
+    update_notifications(dir.path(), &[]).unwrap();
+    let state = load_state(dir.path()).unwrap();
+    assert!(state.notifications.is_empty());
+  }
+
+  #[test]
+  fn cached_notification_roundtrip() {
+    let notif = CachedNotification {
+      id: "42".into(),
+      title: "Important".into(),
+      content: "Flag format changed".into(),
+      date: "2026-03-04T12:00:00Z".into(),
+    };
+    let json = serde_json::to_string(&notif).unwrap();
+    let deserialized: CachedNotification = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, notif);
+  }
+
+  #[test]
+  fn challenge_status_serialization() {
+    assert_eq!(
+      serde_json::to_string(&ChallengeStatus::Unsolved).unwrap(),
+      "\"unsolved\""
+    );
+    assert_eq!(
+      serde_json::to_string(&ChallengeStatus::InProgress).unwrap(),
+      "\"in_progress\""
+    );
+    assert_eq!(
+      serde_json::to_string(&ChallengeStatus::Solved).unwrap(),
+      "\"solved\""
+    );
+  }
+
+  #[test]
+  fn cached_hint_equality() {
+    let h1 = CachedHint {
+      id: "1".into(),
+      content: Some("hint text".into()),
+      cost: 50,
+    };
+    let h2 = CachedHint {
+      id: "1".into(),
+      content: Some("hint text".into()),
+      cost: 50,
+    };
+    let h3 = CachedHint {
+      id: "1".into(),
+      content: None,
+      cost: 0,
+    };
+    assert_eq!(h1, h2);
+    assert_ne!(h1, h3);
+  }
+
+  #[test]
+  fn cached_file_equality() {
+    let f1 = CachedFile {
+      name: "data.bin".into(),
+      url: "/files/data.bin".into(),
+    };
+    let f2 = CachedFile {
+      name: "data.bin".into(),
+      url: "/files/data.bin".into(),
+    };
+    assert_eq!(f1, f2);
+  }
+
+  #[test]
+  fn mark_solved_creates_entry_if_missing() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    // Mark solved without any prior sync
+    mark_solved(dir.path(), "99", "New Challenge", 250, "flag{new}").unwrap();
+
+    let state = load_state(dir.path()).unwrap();
+    let entry = &state.challenges["new challenge"];
+    assert_eq!(entry.id, "99");
+    assert_eq!(entry.status, ChallengeStatus::Solved);
+    assert_eq!(entry.points, Some(250));
+    assert_eq!(entry.flag.as_deref(), Some("flag{new}"));
+  }
+
+  #[test]
+  fn update_sync_detects_platform_solves() {
+    let dir = TempDir::new().unwrap();
+    init_state(dir.path()).unwrap();
+
+    // First sync: unsolved
+    let challenges = vec![make_challenge("1", "Test", "web")];
+    update_sync(dir.path(), &challenges).unwrap();
+    let state = load_state(dir.path()).unwrap();
+    assert_eq!(state.challenges["test"].status, ChallengeStatus::Unsolved);
+
+    // Second sync: now solved_by_me is true
+    let mut solved = make_challenge("1", "Test", "web");
+    solved.solved_by_me = true;
+    update_sync(dir.path(), &[solved]).unwrap();
+    let state = load_state(dir.path()).unwrap();
+    assert_eq!(state.challenges["test"].status, ChallengeStatus::Solved);
   }
 
   #[test]

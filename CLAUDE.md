@@ -60,14 +60,27 @@ Subagent prompt pattern:
    Description: {description}
    Files: {file_list}
    Workspace: {workspace_path}
+   Flag format: {flag_format}
 
    Steps:
    1. Download files with ctf_download_files('{name}')
    2. Triage with {appropriate_triage_tool}
    3. Analyze and solve
-   4. Submit flag with ctf_submit_flag('{name}', 'flag{...}')
-   5. Report back: solved/unsolved/needs-help"
+   4. AUTO-SUBMIT: As soon as you find ANYTHING matching the flag format
+      (e.g. flag{...}, CTF{...}, or the competition's format), immediately
+      call ctf_submit_flag('{name}', '<the_flag>') — do NOT wait, do NOT
+      ask for confirmation, do NOT continue analysis before submitting.
+   5. If the flag is correct, report back as solved.
+      If incorrect, continue analysis and try other candidates.
+   6. Report back: solved/unsolved/needs-help"
 ```
+
+**Flag detection rules for subagents:**
+- Scan ALL tool output (stdout, extracted data, decoded text, solver results) for flag patterns
+- Common patterns: `flag{...}`, `CTF{...}`, `FLAG{...}`, `ctf{...}`, or the competition-specific format from `ctf_workspace_status`
+- If a tool like `angr_analyze`, `transform_chain`, `rsa_toolkit`, or `stego_analyze` returns output containing a flag, **submit it immediately**
+- When multiple flag candidates exist, submit each one — `ctf_submit_flag` reports correct/incorrect so you'll know which worked
+- Never hold a flag without submitting. The moment you see it, submit it.
 
 For parallel execution, launch multiple subagents in a single message using the Task tool.
 
@@ -106,8 +119,13 @@ For parallel execution, launch multiple subagents in a single message using the 
 
 ### 5. Progress Tracking & Flag Submission
 
+- **Auto-submit immediately** — the moment any tool output, decoded string, solver result,
+  or extracted data contains a flag-like pattern, call `ctf_submit_flag` right away. Do NOT
+  wait until the end of analysis. Do NOT ask the user for confirmation before submitting.
 - **Always submit via `ctf_submit_flag`** — this writes to `.ctf-state.json` with the flag,
   points, and timestamp. Never submit flags manually via curl/bash.
+- **Submit, then verify** — `ctf_submit_flag` returns correct/incorrect/already-solved, so
+  there's no risk in submitting. If wrong, keep trying other candidates.
 - **Check progress often** — `ctf_workspace_status()` gives a live scoreboard-style view
   of solved/unsolved per category
 - **`ctf_challenges(solved=true)`** — review what's been solved to avoid duplicating work
@@ -147,8 +165,27 @@ tools/                  Python MCP servers
   tests/                Python test suite
 ```
 
+### Authentication
+
+Token resolution order (highest priority first):
+1. `--token` CLI arg: `ctf mcp --token <token>`
+2. `CTF_TOKEN` environment variable
+3. `token` field in `.ctf.toml` (supports `${VAR}` and `${VAR:-default}` expansion)
+4. System keyring (set via `ctf auth login`)
+
+Example `.ctf.toml` with env var token:
+```toml
+[platform]
+url = "https://ctf.example.com"
+token = "${CTF_TOKEN}"
+
+[workspace]
+name = "my-ctf"
+```
+
 ### MCP Server Registration
 
+**Via CLI:**
 ```bash
 claude mcp add -s user ctf-buster -- /path/to/target/release/ctf mcp --workspace /path/to/workspace
 claude mcp add -s user ctf-crypto -- python3 /path/to/tools/ctf_crypto.py
@@ -156,7 +193,30 @@ claude mcp add -s user ctf-binary -- python3 /path/to/tools/ctf_binary.py
 claude mcp add -s user ctf-forensics -- python3 /path/to/tools/ctf_forensics.py
 ```
 
-The Rust server needs `CTF_TOKEN` env var set for platform authentication.
+**Via `.mcp.json` (recommended):**
+```json
+{
+  "mcpServers": {
+    "ctf-buster": {
+      "command": "./target/release/ctf",
+      "args": ["mcp", "--workspace", "."],
+      "env": { "CTF_TOKEN": "${CTF_TOKEN}" }
+    },
+    "ctf-crypto": {
+      "command": "python3",
+      "args": ["./tools/ctf_crypto.py"]
+    },
+    "ctf-binary": {
+      "command": "python3",
+      "args": ["./tools/ctf_binary.py"]
+    },
+    "ctf-forensics": {
+      "command": "python3",
+      "args": ["./tools/ctf_forensics.py"]
+    }
+  }
+}
+```
 
 ## Conventions
 

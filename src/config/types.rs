@@ -13,6 +13,10 @@ pub struct PlatformConfig {
   #[serde(rename = "type")]
   pub platform_type: Option<String>,
   pub url: String,
+  /// API token — if set here, used directly (no keyring/env needed).
+  /// Supports env var expansion: "${CTF_TOKEN}" resolves at runtime.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub token: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,5 +110,41 @@ mod tests {
     let config: PlatformConfig = toml::from_str(toml).unwrap();
     assert!(config.platform_type.is_none());
     assert_eq!(config.url, "https://ctf.example.com");
+    assert!(config.token.is_none());
+  }
+
+  #[test]
+  fn platform_config_with_token() {
+    let toml = r#"
+      url = "https://ctf.example.com"
+      token = "ctfd_abc123"
+    "#;
+    let config: PlatformConfig = toml::from_str(toml).unwrap();
+    assert_eq!(config.token.as_deref(), Some("ctfd_abc123"));
+  }
+
+  #[test]
+  fn platform_config_with_env_var_token() {
+    let toml = r#"
+      url = "https://ctf.example.com"
+      token = "${CTF_TOKEN}"
+    "#;
+    let config: PlatformConfig = toml::from_str(toml).unwrap();
+    assert_eq!(config.token.as_deref(), Some("${CTF_TOKEN}"));
+  }
+
+  #[test]
+  fn platform_config_token_not_serialized_when_none() {
+    let config = WorkspaceConfig {
+      platform: PlatformConfig {
+        platform_type: Some("ctfd".into()),
+        url: "https://ctf.example.com".into(),
+        token: None,
+      },
+      workspace: WorkspaceSection { name: "test".into() },
+      scaffold: ScaffoldConfig::default(),
+    };
+    let serialized = toml::to_string_pretty(&config).unwrap();
+    assert!(!serialized.contains("token"));
   }
 }

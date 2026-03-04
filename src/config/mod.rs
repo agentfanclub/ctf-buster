@@ -28,6 +28,28 @@ pub fn load_workspace_config(workspace_root: &Path) -> Result<WorkspaceConfig> {
     ))
   })?;
   let config: WorkspaceConfig = toml::from_str(&content)?;
+
+  // Validate platform URL
+  if config.platform.url.is_empty() {
+    return Err(Error::Config("Platform URL cannot be empty".into()));
+  }
+  if !config.platform.url.starts_with("http://") && !config.platform.url.starts_with("https://") {
+    return Err(Error::Config(format!(
+      "Platform URL must start with http:// or https://, got: {}",
+      config.platform.url
+    )));
+  }
+
+  // Validate platform type if specified
+  if let Some(ref pt) = config.platform.platform_type {
+    if !["ctfd", "rctf"].contains(&pt.as_str()) {
+      return Err(Error::Config(format!(
+        "Unknown platform type: '{}'. Supported: ctfd, rctf",
+        pt
+      )));
+    }
+  }
+
   Ok(config)
 }
 
@@ -72,5 +94,77 @@ mod tests {
     let config = load_workspace_config(dir.path()).unwrap();
     assert_eq!(config.platform.platform_type.as_deref(), Some("ctfd"));
     assert_eq!(config.workspace.name, "test");
+  }
+
+  #[test]
+  fn load_workspace_config_rejects_empty_url() {
+    let dir = TempDir::new().unwrap();
+    let toml_content = r#"
+      [platform]
+      url = ""
+      [workspace]
+      name = "test"
+    "#;
+    std::fs::write(dir.path().join(".ctf.toml"), toml_content).unwrap();
+    let err = load_workspace_config(dir.path()).unwrap_err();
+    assert!(err.to_string().contains("cannot be empty"));
+  }
+
+  #[test]
+  fn load_workspace_config_rejects_bad_url() {
+    let dir = TempDir::new().unwrap();
+    let toml_content = r#"
+      [platform]
+      url = "ftp://ctf.example.com"
+      [workspace]
+      name = "test"
+    "#;
+    std::fs::write(dir.path().join(".ctf.toml"), toml_content).unwrap();
+    let err = load_workspace_config(dir.path()).unwrap_err();
+    assert!(err.to_string().contains("http://"));
+  }
+
+  #[test]
+  fn load_workspace_config_rejects_bad_platform_type() {
+    let dir = TempDir::new().unwrap();
+    let toml_content = r#"
+      [platform]
+      type = "htbctf"
+      url = "https://ctf.example.com"
+      [workspace]
+      name = "test"
+    "#;
+    std::fs::write(dir.path().join(".ctf.toml"), toml_content).unwrap();
+    let err = load_workspace_config(dir.path()).unwrap_err();
+    assert!(err.to_string().contains("Unknown platform type"));
+  }
+
+  #[test]
+  fn load_workspace_config_accepts_http_url() {
+    let dir = TempDir::new().unwrap();
+    let toml_content = r#"
+      [platform]
+      url = "http://localhost:8000"
+      [workspace]
+      name = "local-ctf"
+    "#;
+    std::fs::write(dir.path().join(".ctf.toml"), toml_content).unwrap();
+    let config = load_workspace_config(dir.path()).unwrap();
+    assert_eq!(config.platform.url, "http://localhost:8000");
+  }
+
+  #[test]
+  fn load_workspace_config_with_token() {
+    let dir = TempDir::new().unwrap();
+    let toml_content = r#"
+      [platform]
+      url = "https://ctf.example.com"
+      token = "my_secret_token"
+      [workspace]
+      name = "test"
+    "#;
+    std::fs::write(dir.path().join(".ctf.toml"), toml_content).unwrap();
+    let config = load_workspace_config(dir.path()).unwrap();
+    assert_eq!(config.platform.token.as_deref(), Some("my_secret_token"));
   }
 }

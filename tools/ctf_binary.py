@@ -38,13 +38,8 @@ DANGEROUS_FUNCS = {
 }
 
 
-@mcp.tool()
-def binary_triage(path: str) -> str:
-    """Comprehensive one-shot binary analysis — runs file, checksec, rabin2 and returns structured JSON.
-
-    Provides file type, security mitigations, interesting strings, imports/exports,
-    sections, architecture, and flags dangerous functions.
-    """
+def _binary_triage_impl(path: str) -> str:
+    """Internal implementation of binary_triage (callable without MCP decorator)."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})
@@ -132,6 +127,16 @@ def binary_triage(path: str) -> str:
             pass
 
     return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def binary_triage(path: str) -> str:
+    """Comprehensive one-shot binary analysis — runs file, checksec, rabin2 and returns structured JSON.
+
+    Provides file type, security mitigations, interesting strings, imports/exports,
+    sections, architecture, and flags dangerous functions.
+    """
+    return _binary_triage_impl(path)
 
 
 # ── disassemble ──────────────────────────────────────────────────────────────
@@ -333,7 +338,7 @@ def pwntools_template(
     path = os.path.realpath(path)
 
     # Get binary info
-    triage = json.loads(binary_triage(path))
+    triage = json.loads(_binary_triage_impl(path))
     arch = triage.get("arch", "x86")
     bits = triage.get("bits", "64")
 

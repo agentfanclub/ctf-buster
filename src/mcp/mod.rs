@@ -102,14 +102,24 @@ impl McpServer {
     &self,
     Parameters(params): Parameters<SubmitFlagParams>,
   ) -> Result<CallToolResult, McpError> {
+    // Input validation
+    let flag = params.flag.trim();
+    if flag.is_empty() {
+      return Err(McpError::invalid_params("Flag cannot be empty", None));
+    }
+    let challenge_name = params.challenge.trim();
+    if challenge_name.is_empty() {
+      return Err(McpError::invalid_params("Challenge name cannot be empty", None));
+    }
+
     let challenges = self.platform.challenges().await.map_err(to_mcp_error)?;
-    let challenge = resolve_challenge(&*self.platform, &params.challenge, &challenges)
+    let challenge = resolve_challenge(&*self.platform, challenge_name, &challenges)
       .await
       .map_err(to_mcp_error)?;
 
     let result = self
       .platform
-      .submit(&challenge.id, &params.flag)
+      .submit(&challenge.id, flag)
       .await
       .map_err(to_mcp_error)?;
 
@@ -124,7 +134,7 @@ impl McpServer {
         &challenge.id,
         name,
         points,
-        &params.flag,
+        flag,
       );
     }
 
@@ -185,7 +195,7 @@ impl McpServer {
     }
 
     // Update state
-    if params.full.unwrap_or(false) {
+    let (is_full, hints_unlocked) = if params.full.unwrap_or(false) {
       // Fetch full details for each challenge concurrently
       use futures::stream::{self, StreamExt};
 
@@ -201,22 +211,67 @@ impl McpServer {
       .collect()
       .await;
 
-      state::update_sync_full(&self.workspace_root, &detailed).map_err(to_mcp_error)?;
+      // Auto-unlock free hints (cost == 0) during full sync
+      let mut hints_unlocked = 0u32;
+      let platform_for_hints = self.platform.clone();
+      for challenge in &detailed {
+        for hint in &challenge.hints {
+          if hint.cost == 0 && hint.content.is_none() {
+            if let Ok(_unlocked) = platform_for_hints.unlock_hint(&hint.id).await {
+              hints_unlocked += 1;
+            }
+          }
+        }
+      }
+
+      // Re-fetch details for challenges that had hints unlocked to get the content
+      if hints_unlocked > 0 {
+        let platform_refetch = self.platform.clone();
+        let ids_with_hints: Vec<String> = detailed
+          .iter()
+          .filter(|c| c.hints.iter().any(|h| h.cost == 0 && h.content.is_none()))
+          .map(|c| c.id.clone())
+          .collect();
+
+        let mut updated_detailed = detailed;
+        for id in ids_with_hints {
+          if let Ok(refreshed) = platform_refetch.challenge(&id).await {
+            if let Some(entry) = updated_detailed.iter_mut().find(|c| c.id == id) {
+              *entry = refreshed;
+            }
+          }
+        }
+        state::update_sync_full(&self.workspace_root, &updated_detailed).map_err(to_mcp_error)?;
+      } else {
+        state::update_sync_full(&self.workspace_root, &detailed).map_err(to_mcp_error)?;
+      }
+
+      (true, hints_unlocked)
     } else {
       state::update_sync(&self.workspace_root, &challenges).map_err(to_mcp_error)?;
-    }
+      (false, 0)
+    };
 
-    let summary = format!(
-      "Synced {} challenges ({} new, {} files downloaded){}",
+    // Fetch notifications (always, regardless of full flag)
+    let notifications = self.platform.notifications().await.unwrap_or_default();
+    let notif_count = notifications.len();
+    let _ = state::update_notifications(&self.workspace_root, &notifications);
+
+    let mut summary = format!(
+      "Synced {} challenges ({} new, {} files downloaded)",
       challenges.len(),
       new_count,
       file_count,
-      if params.full.unwrap_or(false) {
-        " with full details cached"
-      } else {
-        ""
-      }
     );
+    if is_full {
+      summary.push_str(" with full details cached");
+    }
+    if hints_unlocked > 0 {
+      summary.push_str(&format!(", {} free hints unlocked", hints_unlocked));
+    }
+    if notif_count > 0 {
+      summary.push_str(&format!(", {} notifications fetched", notif_count));
+    }
     Ok(CallToolResult::success(vec![Content::text(summary)]))
   }
 
@@ -308,17 +363,62 @@ impl McpServer {
     Ok(CallToolResult::success(vec![Content::text(json)]))
   }
 
-  #[tool(description = "Unlock a hint for a challenge (may cost points)")]
+  #[tool(
+    description = "Unlock a hint for a challenge. WARNING: hints with cost > 0 will deduct points from your team score."
+  )]
   async fn ctf_unlock_hint(
     &self,
     Parameters(params): Parameters<UnlockHintParams>,
   ) -> Result<CallToolResult, McpError> {
+    let hint_id = params.hint_id.trim();
+    if hint_id.is_empty() {
+      return Err(McpError::invalid_params("Hint ID cannot be empty", None));
+    }
+
+    // Check if we have cached info about this hint's cost
+    if let Ok(ws_state) = state::load_state(&self.workspace_root) {
+      for cs in ws_state.challenges.values() {
+        if let Some(hints) = &cs.hints {
+          for h in hints {
+            if h.id == hint_id && h.cost > 0 {
+              let hint = self
+                .platform
+                .unlock_hint(hint_id)
+                .await
+                .map_err(to_mcp_error)?;
+              let mut result = serde_json::to_value(&hint).map_err(to_mcp_error)?;
+              result["warning"] = serde_json::json!(
+                format!("This hint cost {} points — your team score has been reduced", h.cost)
+              );
+              let json = serde_json::to_string_pretty(&result).map_err(to_mcp_error)?;
+              return Ok(CallToolResult::success(vec![Content::text(json)]));
+            }
+          }
+        }
+      }
+    }
+
     let hint = self
       .platform
-      .unlock_hint(&params.hint_id)
+      .unlock_hint(hint_id)
       .await
       .map_err(to_mcp_error)?;
     let json = serde_json::to_string_pretty(&hint).map_err(to_mcp_error)?;
+    Ok(CallToolResult::success(vec![Content::text(json)]))
+  }
+
+  #[tool(description = "Get competition notifications/announcements from the CTF platform")]
+  async fn ctf_notifications(&self) -> Result<CallToolResult, McpError> {
+    let notifications = self
+      .platform
+      .notifications()
+      .await
+      .map_err(to_mcp_error)?;
+
+    // Update cached state
+    let _ = state::update_notifications(&self.workspace_root, &notifications);
+
+    let json = serde_json::to_string_pretty(&notifications).map_err(to_mcp_error)?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
   }
 }
@@ -332,7 +432,11 @@ impl ServerHandler for McpServer {
          list challenges, read descriptions and hints for context, submit flags, \
          track progress, and download challenge files. Start with ctf_workspace_status \
          to understand the current state, then use ctf_challenges to browse. \
-         Use ctf_sync with full=true to cache all challenge descriptions for context."
+         Use ctf_sync with full=true to cache all challenge descriptions for context. \
+         IMPORTANT: Always auto-submit flags immediately when found — call \
+         ctf_submit_flag as soon as you find any flag-like string (e.g. flag{...}, \
+         CTF{...}). Do not wait or ask for confirmation. The tool returns whether \
+         the flag was correct, so there is no risk in submitting."
           .to_string(),
       )
   }

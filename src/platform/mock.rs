@@ -143,4 +143,13 @@ impl Platform for MockPlatform {
       cost: 50,
     })
   }
+
+  async fn notifications(&self) -> Result<Vec<Notification>> {
+    Ok(vec![Notification {
+      id: "1".into(),
+      title: "Welcome".into(),
+      content: "Welcome to the CTF!".into(),
+      date: "2026-01-01T00:00:00Z".into(),
+    }])
+  }
 }

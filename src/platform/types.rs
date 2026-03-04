@@ -29,6 +29,14 @@ pub struct Hint {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Notification {
+  pub id: String,
+  pub title: String,
+  pub content: String,
+  pub date: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SubmitResult {
   Correct { challenge: String, points: u32 },
   Incorrect,
@@ -152,5 +160,108 @@ mod tests {
     let deserialized: ScoreboardEntry = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized.rank, 1);
     assert_eq!(deserialized.name, "winners");
+  }
+
+  #[test]
+  fn notification_roundtrip() {
+    let notif = Notification {
+      id: "10".into(),
+      title: "Flag Format Change".into(),
+      content: "Use flag{...} format".into(),
+      date: "2026-03-04T00:00:00Z".into(),
+    };
+    let json = serde_json::to_string(&notif).unwrap();
+    let deserialized: Notification = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.id, "10");
+    assert_eq!(deserialized.title, "Flag Format Change");
+    assert_eq!(deserialized.content, "Use flag{...} format");
+    assert_eq!(deserialized.date, "2026-03-04T00:00:00Z");
+  }
+
+  #[test]
+  fn hint_with_content() {
+    let hint = Hint {
+      id: "5".into(),
+      content: Some("Check the RSA exponent".into()),
+      cost: 50,
+    };
+    let json = serde_json::to_string(&hint).unwrap();
+    let deserialized: Hint = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.content.as_deref(), Some("Check the RSA exponent"));
+    assert_eq!(deserialized.cost, 50);
+  }
+
+  #[test]
+  fn hint_without_content() {
+    let hint = Hint {
+      id: "6".into(),
+      content: None,
+      cost: 100,
+    };
+    let json = serde_json::to_string(&hint).unwrap();
+    assert!(json.contains("null"));
+    let deserialized: Hint = serde_json::from_str(&json).unwrap();
+    assert!(deserialized.content.is_none());
+  }
+
+  #[test]
+  fn challenge_file_roundtrip() {
+    let file = ChallengeFile {
+      name: "data.enc".into(),
+      url: "/files/1234/data.enc".into(),
+    };
+    let json = serde_json::to_string(&file).unwrap();
+    let deserialized: ChallengeFile = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.name, "data.enc");
+    assert_eq!(deserialized.url, "/files/1234/data.enc");
+  }
+
+  #[test]
+  fn solve_info_roundtrip() {
+    let solve = SolveInfo {
+      challenge_id: "42".into(),
+      challenge_name: "Easy RSA".into(),
+      solved_at: chrono::Utc::now(),
+      points: 100,
+    };
+    let json = serde_json::to_string(&solve).unwrap();
+    let deserialized: SolveInfo = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.challenge_id, "42");
+    assert_eq!(deserialized.points, 100);
+  }
+
+  #[test]
+  fn submit_result_rate_limited_with_retry() {
+    let result = SubmitResult::RateLimited {
+      retry_after: Some(30),
+    };
+    let json = serde_json::to_string(&result).unwrap();
+    assert!(json.contains("30"));
+    let deserialized: SubmitResult = serde_json::from_str(&json).unwrap();
+    match deserialized {
+      SubmitResult::RateLimited { retry_after } => assert_eq!(retry_after, Some(30)),
+      _ => panic!("wrong variant"),
+    }
+  }
+
+  #[test]
+  fn challenge_empty_fields() {
+    let challenge = Challenge {
+      id: "1".into(),
+      name: "Minimal".into(),
+      category: "misc".into(),
+      description: String::new(),
+      value: 0,
+      solves: 0,
+      solved_by_me: false,
+      files: vec![],
+      tags: vec![],
+      hints: vec![],
+    };
+    let json = serde_json::to_string(&challenge).unwrap();
+    let deserialized: Challenge = serde_json::from_str(&json).unwrap();
+    assert!(deserialized.description.is_empty());
+    assert!(deserialized.files.is_empty());
+    assert!(deserialized.hints.is_empty());
   }
 }

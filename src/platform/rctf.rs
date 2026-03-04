@@ -287,6 +287,10 @@ impl Platform for RctfPlatform {
       "rCTF does not support hint unlocking".into(),
     ))
   }
+
+  async fn notifications(&self) -> Result<Vec<Notification>> {
+    Ok(vec![]) // rCTF does not have a notifications endpoint
+  }
 }
 
 #[cfg(test)]
