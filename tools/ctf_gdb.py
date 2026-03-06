@@ -115,19 +115,7 @@ def gdb_run(
     stdin_hex: str = "",
     timeout: int = 30,
 ) -> str:
-    """Run a binary under GDB with a sequence of GDB commands.
-
-    Args:
-        path: Path to the binary
-        commands: List of GDB commands (e.g., ["break main", "run", "info registers"])
-        args: Command-line arguments for the binary
-        stdin_data: String data to feed as stdin
-        stdin_hex: Hex-encoded bytes to feed as stdin (alternative to stdin_data)
-        timeout: Execution timeout in seconds
-
-    Returns:
-        JSON with GDB output, parsed registers, and backtrace.
-    """
+    """Run a binary under GDB with a list of commands. Returns output, registers, and backtrace."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})
@@ -200,19 +188,7 @@ def gdb_break_inspect(
     stdin_hex: str = "",
     memory_reads: list[str] | None = None,
 ) -> str:
-    """Set breakpoints, run to them, and dump registers, stack, and memory.
-
-    Args:
-        path: Path to the binary
-        breakpoints: Breakpoint locations — function names or hex addresses ("0x401234")
-        args: Command-line arguments for the binary
-        stdin_data: String data to feed as stdin
-        stdin_hex: Hex-encoded bytes for stdin
-        memory_reads: Optional GDB x/ specs (e.g., ["x/32xb $rsp", "x/s 0x404000"])
-
-    Returns:
-        JSON with per-breakpoint snapshots: registers, stack, memory, backtrace.
-    """
+    """Set breakpoints, run, and dump registers/stack/memory at each hit."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})
@@ -309,21 +285,7 @@ def gdb_trace_input(
     breakpoint: str = "",
     pattern_length: int = 200,
 ) -> str:
-    """Trace where user input lands in memory — finds buffer overflow offsets.
-
-    If no input is provided, generates a cyclic pattern. Catches SIGSEGV and
-    shows where pattern bytes appear in registers and on the stack.
-
-    Args:
-        path: Path to the binary
-        input_data: String input to send
-        input_hex: Hex-encoded input bytes
-        breakpoint: Optional breakpoint instead of waiting for crash
-        pattern_length: Length of cyclic pattern to generate (default 200)
-
-    Returns:
-        JSON with crash info, register values, pattern offsets, and stack layout.
-    """
+    """Trace input in memory to find buffer overflow offsets. Auto-generates cyclic pattern if no input given."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})
@@ -443,15 +405,7 @@ def gdb_trace_input(
 
 @mcp.tool()
 def gdb_checksec_runtime(path: str, symbols: list[str] | None = None) -> str:
-    """Get runtime security info — ASLR state, libc base, GOT entries, symbol addresses.
-
-    Args:
-        path: Path to the binary
-        symbols: Optional symbol names to resolve (e.g., ["system", "execve"])
-
-    Returns:
-        JSON with base addresses, process mappings, and resolved symbols.
-    """
+    """Get runtime security info — ASLR state, libc base, GOT entries, and resolved symbol addresses."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})

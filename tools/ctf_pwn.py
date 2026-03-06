@@ -163,11 +163,7 @@ def _pwn_triage_impl(path: str) -> str:
 
 @mcp.tool()
 def pwn_triage(path: str) -> str:
-    """Comprehensive one-shot binary analysis — runs file, checksec, rabin2 and returns structured JSON.
-
-    Provides file type, security mitigations, interesting strings, imports/exports,
-    sections, architecture, and flags dangerous functions.
-    """
+    """One-shot binary analysis — file type, checksec, imports/exports, dangerous functions, architecture."""
     return _pwn_triage_impl(path)
 
 
@@ -178,13 +174,7 @@ def pwn_triage(path: str) -> str:
 def pwn_pattern_offset(
     action: str = "create", length: int = 200, value: str = ""
 ) -> str:
-    """Generate cyclic patterns or find offset from a crash value using pwntools.
-
-    Args:
-        action: "create" to generate a pattern, "find" to find offset of a value
-        length: Pattern length for creation (default 200)
-        value: The crash value to find offset for (hex like "0x41414141" or ASCII)
-    """
+    """Generate cyclic patterns (action=create) or find offset from crash value (action=find)."""
     from pwn import cyclic, cyclic_find
 
     if action == "create":
@@ -227,14 +217,7 @@ def pwn_shellcode_generate(
     os_name: str = "linux",
     payload: str = "sh",
 ) -> str:
-    """Generate shellcode using pwntools shellcraft.
-
-    Args:
-        arch: Architecture — "amd64", "i386", "arm", "aarch64", "mips"
-        os_name: OS — "linux", "freebsd"
-        payload: Payload type — "sh" (spawn shell), "cat_flag" (cat flag.txt),
-                 "connect_back(host,port)" (reverse shell), "execve(path,args)"
-    """
+    """Generate shellcode via pwntools shellcraft. Payload: sh, cat_flag, connect_back(host,port), execve(path,args)."""
     import pwn
 
     with pwn.context.local(arch=arch, os=os_name):
@@ -303,14 +286,7 @@ def pwn_pwntools_template(
     technique: str = "ret2win",
     win_function: str = "",
 ) -> str:
-    """Generate a complete pwntools exploit script skeleton from binary analysis.
-
-    Args:
-        path: Path to the binary to exploit
-        remote: Remote target as "host:port" (optional)
-        technique: Exploit technique — "ret2win", "ret2libc", "rop_chain", "format_string", "shellcode"
-        win_function: Name of the win/flag function for ret2win (auto-detected if empty)
-    """
+    """Generate pwntools exploit skeleton. Techniques: ret2win, ret2libc, rop_chain, format_string, shellcode."""
     path = os.path.realpath(path)
 
     # Get binary info
@@ -492,23 +468,7 @@ def pwn_angr_analyze(
     find_string: str = "",
     stdin_length: int = 64,
 ) -> str:
-    """Use angr for automatic symbolic execution and constraint solving on binaries.
-
-    Best for: simple stack-based challenges, finding inputs that reach a target,
-    solving password checks, and exploring reachable paths.
-
-    Args:
-        path: Path to the binary
-        mode: Analysis mode:
-            - "auto": Try to find a path that prints flag-like output
-            - "find_addr": Find input reaching target_addr (hex)
-            - "find_string": Find input that causes find_string to appear in stdout
-            - "explore": Explore execution paths and report reachable functions
-        target_addr: Target address for find_addr mode (hex, e.g. "0x401234")
-        avoid_addrs: Comma-separated addresses to avoid (hex)
-        find_string: String to search for in stdout for find_string/auto modes
-        stdin_length: Maximum stdin input length for symbolic buffer (default 64)
-    """
+    """Automatic symbolic execution with angr. Modes: auto (find flag output), find_addr, find_string, explore."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})
@@ -671,16 +631,7 @@ def pwn_angr_analyze(
 def pwn_libc_lookup(
     symbols: str,
 ) -> str:
-    """Identify a remote libc version from leaked function addresses via libc.rip.
-
-    Args:
-        symbols: JSON string mapping symbol names to leaked hex addresses,
-                 e.g. '{"puts": "0x7f1234567890", "printf": "0x7f1234567abc"}'
-
-    The tool computes page offsets (last 12 bits) automatically and queries
-    the libc.rip database. Returns matching libc versions with key offsets
-    (system, /bin/sh, __free_hook) and the computed libc base address.
-    """
+    """Identify libc version from leaked addresses via libc.rip. symbols: JSON like '{"puts":"0x7f..."}'."""
     import requests
 
     try:
@@ -753,16 +704,7 @@ def pwn_format_string(
     arch: str = "amd64",
     padding: int = 0,
 ) -> str:
-    """Generate format string exploit payloads using pwntools.
-
-    Args:
-        mode: "find_offset" (probe payload), "write" (arbitrary write), "info" (reference)
-        offset: Stack offset where format string input appears (for write mode)
-        writes: JSON dict of {hex_addr: hex_value} for write mode,
-                e.g. '{"0x404020": "0x401234"}'
-        arch: Architecture — "amd64" or "i386" (default "amd64")
-        padding: Bytes already written before format string (numbwritten for pwntools)
-    """
+    """Format string exploits. Modes: find_offset (probe), write (arbitrary write), info (reference)."""
     import pwn
 
     with pwn.context.local(arch=arch):

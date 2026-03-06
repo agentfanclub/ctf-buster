@@ -464,16 +464,7 @@ def _analyze_bash_source(source: str) -> dict:
 
 @mcp.tool()
 def jail_analyze_source(source: str, jail_type: str = "auto") -> str:
-    """Analyze jail source code to identify restrictions, blocked items, and suggest bypasses.
-
-    Parses the jail script (Python or bash) to find blacklisted strings/chars,
-    restriction mechanisms (blacklist, AST filtering, audit hooks, builtins wiped),
-    input length limits, and generates bypass suggestions.
-
-    Args:
-        source: The jail's source code (the script that wraps/filters user input)
-        jail_type: "python", "bash", or "auto" (auto-detects from source)
-    """
+    """Analyze jail source code — finds blocked strings/chars, restriction type, and suggests bypasses."""
     if not source.strip():
         return json.dumps({"error": "Empty source code"})
 
@@ -603,17 +594,7 @@ def jail_find_subclass_chain(
     blocked_strings: str = "",
     blocked_chars: str = "",
 ) -> str:
-    """Walk Python MRO/subclass tree to find chains reaching a target module or builtin.
-
-    Enumerates ().__class__.__base__.__subclasses__() and inspects each class's
-    __init__.__globals__ for the target. Returns working Python expressions that
-    recover the target without using import.
-
-    Args:
-        target: Module or builtin to find (e.g. "os", "subprocess", "__import__", "open")
-        blocked_strings: Comma-separated strings to avoid in generated paths
-        blocked_chars: Characters to avoid in generated paths
-    """
+    """Find Python MRO/subclass chains to reach a target (os, subprocess, __import__) without import."""
     bl_strings = (
         [s.strip() for s in blocked_strings.split(",") if s.strip()]
         if blocked_strings
@@ -859,18 +840,7 @@ def jail_construct_string(
     blocked_strings: str = "",
     jail_type: str = "python",
 ) -> str:
-    """Construct a target string using only allowed characters/functions.
-
-    Generates multiple representations of the target string that avoid
-    blocked characters and substrings. Useful for building strings like
-    "__import__", "os", "/flag" when those chars are filtered.
-
-    Args:
-        target: The string to construct (e.g. "__import__", "os", "/flag")
-        blocked_chars: Characters that cannot appear in the expression
-        blocked_strings: Comma-separated strings that cannot appear
-        jail_type: "python" or "bash"
-    """
+    """Build a target string (e.g. "__import__", "/flag") using only allowed characters."""
     if not target:
         return json.dumps({"error": "Empty target string"})
 
@@ -1166,20 +1136,7 @@ def jail_build_payload(
     flag_path: str = "/flag",
     max_length: int = 0,
 ) -> str:
-    """Generate jail bypass payloads that avoid blocked strings and characters.
-
-    Produces multiple payload variants for Python or bash jails, filtered to
-    exclude any blocked items. Payloads are ranked by length.
-
-    Args:
-        jail_type: "python" or "bash"
-        blocked_strings: Comma-separated blocked strings (e.g. "import,os,system")
-        blocked_chars: Blocked characters as a string (e.g. "_.[]")
-        builtins_wiped: Whether Python __builtins__ is {} (triggers subclass chain payloads)
-        goal: "read_flag", "exec_command", "get_shell", "recover_builtins"
-        flag_path: Path to flag file (for read_flag goal)
-        max_length: Maximum payload length (0 = unlimited)
-    """
+    """Generate jail bypass payloads avoiding blocked strings/chars. Goals: read_flag, exec_command, get_shell."""
     bl_strings = (
         set(s.strip() for s in blocked_strings.split(",") if s.strip())
         if blocked_strings

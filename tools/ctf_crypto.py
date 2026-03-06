@@ -132,17 +132,7 @@ def _apply_op(data: str, op: str) -> str:
 
 @mcp.tool()
 def crypto_transform_chain(data: str, operations: list[str]) -> str:
-    """Apply a chain of encoding/decoding operations to data, returning intermediate results.
-
-    Supported operations:
-    - base64_encode, base64_decode, hex_encode, hex_decode
-    - url_encode, url_decode, rot13, rot(N) where N is shift amount
-    - xor(key), vigenere_encode(key), vigenere_decode(key)
-    - reverse, upper, lower, strip, atbash
-    - binary_encode, binary_decode, ascii_to_decimal, decimal_to_ascii
-
-    Example: transform_chain("SGVsbG8=", ["base64_decode", "hex_encode"])
-    """
+    """Apply chained encoding/decoding operations (base64, hex, rot, xor, vigenere, atbash, etc.)."""
     steps = []
     current = data
     for op in operations:
@@ -304,18 +294,7 @@ def crypto_rsa_toolkit(
     dp: str = "",
     dq: str = "",
 ) -> str:
-    """Perform common RSA CTF attacks.
-
-    Args:
-        n: The modulus (decimal string)
-        e: Public exponent (default 65537)
-        c: Ciphertext to decrypt (decimal string, optional)
-        attack: Attack to try — "auto", "factordb", "small_e", "wiener", "fermat", "given_pq"
-        p: Known factor p (if available)
-        q: Known factor q (if available)
-        dp: CRT exponent dp (if available)
-        dq: CRT exponent dq (if available)
-    """
+    """RSA attacks: auto, factordb, small_e, wiener, fermat, given_pq. Provide n, e, c to decrypt."""
     import sympy
 
     n_int = int(n)
@@ -482,18 +461,7 @@ def crypto_rsa_toolkit(
 
 @mcp.tool()
 def crypto_math_solve(mode: str, expression: str, variables: str = "") -> str:
-    """Evaluate math expressions or solve constraints.
-
-    Args:
-        mode: "eval" to evaluate a sympy expression, "z3" to solve constraints
-        expression: The expression to evaluate or constraints (semicolon-separated for z3)
-        variables: Comma-separated variable names for z3 mode (e.g. "x,y,z")
-
-    Examples:
-        math_solve("eval", "factorint(1234567890)")
-        math_solve("eval", "pow(7, -1, 13)")
-        math_solve("z3", "x + y == 10; x - y == 4", "x,y")
-    """
+    """Evaluate sympy expressions (mode=eval) or solve z3 constraints (mode=z3)."""
     if mode == "eval":
         import sympy
 
@@ -748,14 +716,7 @@ def crypto_xor_analyze(
     known_plaintext_hex: str = "",
     max_key_length: int = 32,
 ) -> str:
-    """Analyze XOR-encrypted data: recover keys from known plaintext, estimate key length, brute-force single-byte keys.
-
-    Args:
-        data_hex: Hex-encoded ciphertext
-        known_plaintext: Known plaintext (ASCII) for key recovery
-        known_plaintext_hex: Known plaintext (hex) for key recovery (binary data)
-        max_key_length: Maximum key length to test for IC/Kasiski analysis (default 32)
-    """
+    """XOR analysis — key recovery from known plaintext, key length estimation, single-byte brute force."""
     try:
         data = bytes.fromhex(
             data_hex.replace(" ", "").replace("0x", "").replace("\\x", "")

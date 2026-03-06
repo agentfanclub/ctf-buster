@@ -47,14 +47,7 @@ def _parse_r2_json(stdout):
 
 @mcp.tool()
 def rev_functions(path: str) -> str:
-    """List all functions with addresses, sizes, and call targets after full analysis.
-
-    Args:
-        path: Path to the binary
-
-    Returns:
-        JSON list of functions with name, address, size, and basic block count.
-    """
+    """List all functions with addresses, sizes, and call targets."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})
@@ -100,15 +93,7 @@ def rev_functions(path: str) -> str:
 def rev_decompile(path: str, function: str = "main", decompiler: str = "auto") -> str:
     """Decompile a function to pseudocode.
 
-    Tries r2ghidra (pdg), r2dec (pdd), or falls back to annotated disassembly.
-
-    Args:
-        path: Path to the binary
-        function: Function name or hex address to decompile (default: "main")
-        decompiler: "r2ghidra", "r2dec", or "auto" (tries both, then falls back to disasm)
-
-    Returns:
-        JSON with decompiled pseudocode or annotated assembly.
+    Decompiler: r2ghidra, r2dec, or auto (tries both, falls back to disasm).
     """
     path = os.path.realpath(path)
     if not os.path.isfile(path):
@@ -170,15 +155,7 @@ def rev_decompile(path: str, function: str = "main", decompiler: str = "auto") -
 
 @mcp.tool()
 def rev_strings_xrefs(path: str, filter: str = "") -> str:
-    """List strings with the functions that reference them.
-
-    Args:
-        path: Path to the binary
-        filter: Optional regex to filter strings (e.g., "flag|password|key")
-
-    Returns:
-        JSON list of strings with addresses, sections, and referencing functions.
-    """
+    """List strings with xrefs to functions that reference them. Optional regex filter."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})

@@ -40,7 +40,7 @@ impl McpServer {
   }
 
   #[tool(
-    description = "List CTF challenges with optional filters. Returns challenges with cached descriptions/hints when available."
+    description = "List CTF challenges with optional category/solved/unsolved filters."
   )]
   async fn ctf_challenges(&self, Parameters(params): Parameters<ChallengesParams>) -> Result<CallToolResult, McpError> {
     let mut challenges = self.platform.challenges().await.map_err(to_mcp_error)?;
@@ -88,8 +88,35 @@ impl McpServer {
   ) -> Result<CallToolResult, McpError> {
     let challenges = self.platform.challenges().await.map_err(to_mcp_error)?;
     let challenge = resolve_challenge(&*self.platform, &params.id_or_name, &challenges).await.map_err(to_mcp_error)?;
-    let json = serde_json::to_string_pretty(&challenge).map_err(to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    // Build compact output instead of dumping full JSON (descriptions can be huge HTML)
+    let mut lines = Vec::new();
+    lines.push(format!("{} [{}] — {} pts, {} solves", challenge.name, challenge.category, challenge.value, challenge.solves));
+    let solved = if challenge.solved_by_me { "Yes" } else { "No" };
+    lines.push(format!("Solved: {solved}"));
+
+    // Truncate description to avoid context bloat
+    let desc = if challenge.description.len() > 2000 {
+      format!("{}... (truncated, {} chars total)", &challenge.description[..2000], challenge.description.len())
+    } else {
+      challenge.description.clone()
+    };
+    lines.push(format!("Description: {desc}"));
+
+    if !challenge.files.is_empty() {
+      let file_names: Vec<&str> = challenge.files.iter().map(|f| f.name.as_str()).collect();
+      lines.push(format!("Files: {}", file_names.join(", ")));
+    }
+    if !challenge.hints.is_empty() {
+      for h in &challenge.hints {
+        let content = h.content.as_deref().unwrap_or("(locked)");
+        let cost_str = if h.cost > 0 { format!(" (cost: {})", h.cost) } else { String::new() };
+        lines.push(format!("Hint{cost_str}: {content}"));
+      }
+    }
+    if !challenge.tags.is_empty() {
+      lines.push(format!("Tags: {}", challenge.tags.join(", ")));
+    }
+    Ok(CallToolResult::success(vec![Content::text(lines.join("\n"))]))
   }
 
   #[tool(
@@ -137,7 +164,7 @@ impl McpServer {
   }
 
   #[tool(
-    description = "Sync challenges from the CTF platform — creates workspace directories, downloads files, and updates local state. Use full=true to also fetch descriptions/hints for all challenges."
+    description = "Sync challenges from platform — scaffold dirs, download files. Use full=true for descriptions/hints."
   )]
   async fn ctf_sync(&self, Parameters(params): Parameters<SyncParams>) -> Result<CallToolResult, McpError> {
     let challenges = self.platform.challenges().await.map_err(to_mcp_error)?;
@@ -351,7 +378,7 @@ impl McpServer {
   }
 
   #[tool(
-    description = "Get the challenge priority queue — shows what to solve next, what's in progress, and what failed. Persists across agent restarts."
+    description = "Get challenge priority queue — queued, in-progress, and failed challenges."
   )]
   async fn ctf_queue_status(&self) -> Result<CallToolResult, McpError> {
     let orch = state::load_orchestration(&self.workspace_root).map_err(to_mcp_error)?;
@@ -389,7 +416,7 @@ impl McpServer {
   }
 
   #[tool(
-    description = "Update the challenge queue — set priorities, mark challenges as in-progress or failed, prioritize specific challenges, or retry failed ones. Persists across agent restarts."
+    description = "Update challenge queue — actions: set_queue, start, complete, fail, prioritize, retry, clear."
   )]
   async fn ctf_queue_update(
     &self,
@@ -519,7 +546,7 @@ impl McpServer {
   }
 
   #[tool(
-    description = "Auto-score and queue all unsolved challenges by priority. Implements the scoring algorithm: category_score (crypto/forensics +10, web +8, rev +6, misc +4, pwn +2) + difficulty_bonus (>50 solves: +20, 20-50: +10, <20: +0) + solve_bonus (points/solves < 10: +5). Replaces the current queue. Call this after ctf_sync to automatically prioritize what to solve next."
+    description = "Auto-score and queue all unsolved challenges by priority. Call after ctf_sync."
   )]
   async fn ctf_auto_queue(&self, Parameters(params): Parameters<AutoQueueParams>) -> Result<CallToolResult, McpError> {
     // Get current challenges from platform
@@ -621,7 +648,7 @@ impl McpServer {
   }
 
   #[tool(
-    description = "Generate ready-to-use subagent prompts for solving challenges. Takes from the top of the queue (or a specific challenge). Returns structured JSON with: challenge info, recommended model, prompt_file path, and tool suggestions. Read each prompt_file and pass its content to the Task tool to launch subagents."
+    description = "Generate subagent solve prompts from queue. Returns prompt_file paths and recommended models."
   )]
   async fn ctf_generate_solve_prompt(
     &self,
@@ -849,7 +876,7 @@ Use forensics_file_triage on any downloaded files to determine content type, the
   }
 
   #[tool(
-    description = "Save a writeup for a solved challenge — records methodology and tools used, generates writeup.md in the challenge directory. Call this AFTER successfully submitting a flag."
+    description = "Save a writeup for a solved challenge. Call AFTER submitting a correct flag."
   )]
   async fn ctf_save_writeup(&self, Parameters(params): Parameters<WriteupParams>) -> Result<CallToolResult, McpError> {
     let challenge_name = params.challenge.trim();
@@ -902,28 +929,8 @@ Use forensics_file_triage on any downloaded files to determine content type, the
 impl ServerHandler for McpServer {
   fn get_info(&self) -> ServerInfo {
     ServerInfo::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
-      "CTF competition assistant with two modes of operation:\n\n\
-         \
-         ORCHESTRATOR MODE (main agent coordinating a CTF):\n\
-         1. ctf_sync(full=true) — fetch all challenges, descriptions, files, unlock free hints\n\
-         2. ctf_auto_queue() — auto-score and prioritize all unsolved challenges\n\
-         3. ctf_generate_solve_prompt(count=N) — get prompt_file paths + metadata (auto-marks as in_progress)\n\
-         4. Read each prompt_file, launch subagents via Task tool with the content + recommended models\n\
-         5. After subagents complete: check ctf_challenges(unsolved=true) for remaining work\n\
-         6. For failures: ctf_queue_update(action='fail', challenge='...', notes='...')\n\
-         7. To prioritize a specific challenge: ctf_queue_update(action='prioritize', challenge='...')\n\
-         8. Loop back to step 1\n\n\
-         \
-         SOLVER MODE (subagent solving a specific challenge):\n\
-         - Download files with ctf_download_files, triage with category tools, analyze and solve\n\
-         - AUTO-SUBMIT flags immediately: call ctf_submit_flag as soon as you find any flag-like \
-         string (flag{...}, CTF{...}). Do not wait or ask. The tool returns correct/incorrect.\n\
-         - After correct submission: call ctf_save_writeup to document methodology\n\
-         - After solving or giving up: call ctf_queue_update(action='complete'|'fail', challenge='...')\n\n\
-         \
-         Key tools: ctf_workspace_status (overview), ctf_challenges (browse), \
-         ctf_sync (fetch from platform), ctf_auto_queue (score/prioritize), \
-         ctf_generate_solve_prompt (create subagent prompts), ctf_queue_update (manage queue state)"
+      "CTF platform tools. Orchestrator: ctf_sync → ctf_auto_queue → ctf_generate_solve_prompt → launch subagents. \
+       Solver: ctf_download_files → triage → solve → ctf_submit_flag → ctf_save_writeup → ctf_queue_update."
         .to_string(),
     )
   }

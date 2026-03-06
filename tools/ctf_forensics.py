@@ -183,16 +183,7 @@ def _check_trailing_data(path, mime_type):
 
 @mcp.tool()
 def forensics_stego_analyze(path: str, password: str = "") -> str:
-    """Systematic steganography analysis — tries ALL applicable tools for the file type.
-
-    Args:
-        path: Path to the file to analyze
-        password: Optional password for tools that support it (steghide, etc.)
-
-    For PNG: zsteg (LSB/MSB, all channel combos), trailing data, palette analysis
-    For JPEG: steghide, EXIF/comment, EOF data, jsteg
-    For WAV/audio: LSB audio, spectrogram hints
-    """
+    """Systematic stego analysis — tries all applicable tools (zsteg, steghide, jsteg, etc.) for the file type."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})
@@ -550,14 +541,7 @@ def _entropy_interpretation(entropy):
 
 @mcp.tool()
 def forensics_entropy_analysis(path: str, block_size: int = 4096) -> str:
-    """Calculate block-level entropy to detect encrypted/compressed regions.
-
-    Args:
-        path: Path to the file
-        block_size: Size of each block in bytes (default 4096)
-
-    Returns per-block entropy values to identify interesting regions.
-    """
+    """Block-level entropy analysis to detect encrypted/compressed regions."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})
