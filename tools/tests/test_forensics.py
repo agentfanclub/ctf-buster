@@ -1,4 +1,4 @@
-"""Tests for ctf_forensics.py — pure-Python helper functions and tool JSON output."""
+"""Tests for ctf_forensics.py, pure-Python helper functions and tool JSON output."""
 
 import json
 import math
@@ -31,7 +31,7 @@ extract_embedded = _unwrap(ctf_forensics.forensics_extract_embedded)
 entropy_analysis = _unwrap(ctf_forensics.forensics_entropy_analysis)
 image_analysis = _unwrap(ctf_forensics.forensics_image_analysis)
 
-# ── _calculate_entropy tests ─────────────────────────────────────────────────
+# -- _calculate_entropy tests ------------------------------------------------─
 
 
 class TestCalculateEntropy:
@@ -39,24 +39,24 @@ class TestCalculateEntropy:
         assert _calculate_entropy(b"") == 0.0
 
     def test_single_byte_repeated(self):
-        # All zeros — only one symbol, entropy = 0
+        # All zeros, only one symbol, entropy = 0
         data = b"\x00" * 1000
         assert _calculate_entropy(data) == 0.0
 
     def test_two_equal_symbols(self):
-        # Half 0x00, half 0x01 — entropy should be 1.0 bit
+        # Half 0x00, half 0x01, entropy should be 1.0 bit
         data = b"\x00" * 500 + b"\x01" * 500
         entropy = _calculate_entropy(data)
         assert abs(entropy - 1.0) < 0.01
 
     def test_four_equal_symbols(self):
-        # Four equally distributed symbols — entropy should be 2.0 bits
+        # Four equally distributed symbols, entropy should be 2.0 bits
         data = b"\x00" * 250 + b"\x01" * 250 + b"\x02" * 250 + b"\x03" * 250
         entropy = _calculate_entropy(data)
         assert abs(entropy - 2.0) < 0.01
 
     def test_all_256_bytes_uniform(self):
-        # All 256 byte values equally distributed — max entropy = 8.0
+        # All 256 byte values equally distributed, max entropy = 8.0
         data = bytes(range(256)) * 100
         entropy = _calculate_entropy(data)
         assert abs(entropy - 8.0) < 0.01
@@ -91,7 +91,7 @@ class TestCalculateEntropy:
         assert _calculate_entropy(data) <= 8.0
 
 
-# ── _entropy_interpretation tests ────────────────────────────────────────────
+# -- _entropy_interpretation tests --------------------------------------------
 
 
 class TestEntropyInterpretation:
@@ -131,7 +131,7 @@ class TestEntropyInterpretation:
             assert len(result) > 0
 
 
-# ── _check_trailing_data tests ───────────────────────────────────────────────
+# -- _check_trailing_data tests ----------------------------------------------─
 
 
 class TestCheckTrailingData:
@@ -241,7 +241,7 @@ class TestCheckTrailingData:
         assert result["found"] is False
 
 
-# ── file_triage tool tests ───────────────────────────────────────────────────
+# -- file_triage tool tests --------------------------------------------------─
 
 
 class TestFileTriage:
@@ -307,7 +307,7 @@ class TestFileTriage:
             os.unlink(path)
 
 
-# ── stego_analyze tool tests ─────────────────────────────────────────────────
+# -- stego_analyze tool tests ------------------------------------------------─
 
 
 class TestStegoAnalyze:
@@ -337,7 +337,7 @@ class TestStegoAnalyze:
             os.unlink(path)
 
 
-# ── extract_embedded tool tests ──────────────────────────────────────────────
+# -- extract_embedded tool tests ----------------------------------------------
 
 
 class TestExtractEmbedded:
@@ -368,7 +368,7 @@ class TestExtractEmbedded:
             os.unlink(path)
 
 
-# ── entropy_analysis tool tests ──────────────────────────────────────────────
+# -- entropy_analysis tool tests ----------------------------------------------
 
 
 class TestEntropyAnalysis:
@@ -448,7 +448,7 @@ class TestEntropyAnalysis:
             os.unlink(path)
 
 
-# ── image_analysis tool tests ────────────────────────────────────────────────
+# -- image_analysis tool tests ------------------------------------------------
 
 
 class TestImageAnalysis:
@@ -574,7 +574,7 @@ class TestImageAnalysis:
             os.unlink(path)
 
 
-# ── JSON output validation ───────────────────────────────────────────────────
+# -- JSON output validation --------------------------------------------------─
 
 
 class TestJsonOutput:
@@ -605,7 +605,7 @@ class TestJsonOutput:
             os.unlink(path)
 
 
-# ── TestStegoMocked — mock stego helper functions ───────────────────────────
+# -- TestStegoMocked, mock stego helper functions --------------------------─
 
 
 class TestStegoMocked:

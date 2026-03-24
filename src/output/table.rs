@@ -49,7 +49,11 @@ pub fn print_challenges(challenges: &[Challenge]) {
 
   let table = Table::new(rows).with(tabled::settings::Style::rounded()).to_string();
   println!("{table}");
-  println!("  {} challenges ({} solved)", challenges.len(), challenges.iter().filter(|c| c.solved_by_me).count());
+  println!(
+    "  {} challenges ({} solved)",
+    challenges.len(),
+    challenges.iter().filter(|c| c.solved_by_me).count()
+  );
 }
 
 pub fn print_scoreboard(entries: &[ScoreboardEntry]) {
@@ -58,8 +62,10 @@ pub fn print_scoreboard(entries: &[ScoreboardEntry]) {
     return;
   }
 
-  let rows: Vec<ScoreboardRow> =
-    entries.iter().map(|e| ScoreboardRow { rank: e.rank, name: e.name.clone(), score: e.score }).collect();
+  let rows: Vec<ScoreboardRow> = entries
+    .iter()
+    .map(|e| ScoreboardRow { rank: e.rank, name: e.name.clone(), score: e.score })
+    .collect();
 
   let table = Table::new(rows).with(tabled::settings::Style::rounded()).to_string();
   println!("{table}");

@@ -4,12 +4,13 @@ result
 
 # Nix / direnv
 .direnv/
-.envrc
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
 .venv/
+*.egg-info/
 .coverage
 .coverage.*
 .pytest_cache/
@@ -20,21 +21,22 @@ htmlcov/
 .vscode/
 *.swp
 *.swo
+*~
 
 # Credentials & secrets
 .env
 *.cookie
 *.token
+cookies.txt
 
-# CTF workspace test data
+# CTF workspace data
 test-workspace/
+pwnyctf/
+dicectf/
 
 # Claude Code
 .claude/
+.mcp.json
 
 # Planning (not shipped)
 PLAN.md
-
-pwnyctf
-cookies.txt
-.mcp.json

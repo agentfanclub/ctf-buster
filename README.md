@@ -1,25 +1,25 @@
 # CTF-Buster
 
-An AI-powered CTF (Capture The Flag) toolkit combining a Rust CLI with four MCP
-(Model Context Protocol) servers. Designed to let AI agents -- particularly
-Claude Code -- interact with CTFd and rCTF platforms, perform cryptographic
+An AI-powered CTF (Capture The Flag) toolkit combining a Rust CLI with seven MCP
+(Model Context Protocol) servers. Designed to let AI agents, particularly
+Claude Code, interact with CTFd and rCTF platforms, perform cryptographic
 attacks, analyze binaries, and run forensic investigations, all from a unified
 workspace.
 
 ## Features
 
-- **Platform integration** -- authenticate, sync challenges, submit flags, and
+- **Platform integration** - authenticate, sync challenges, submit flags, and
   track scores on CTFd and rCTF with automatic platform detection.
-- **Workspace management** -- initialize per-competition workspaces with
+- **Workspace management** - initialize per-competition workspaces with
   scaffolded directories, solve templates, and notes files.
-- **7 MCP servers / 44 tools** -- expose every capability over MCP so AI agents
+- **7 MCP servers / 44 tools** - expose every capability over MCP so AI agents
   can call them directly.
-- **TUI dashboard** -- run `ctf dashboard` in a separate terminal to monitor
+- **TUI dashboard** - run `ctf dashboard` in a separate terminal to monitor
   progress in real-time while the AI orchestrator works.
-- **160+ security tools** -- the Nix dev shell bundles a curated set of
+- **90+ security tools** - the Nix dev shell bundles a curated set of
   security CLI tools (radare2, Ghidra, binwalk, hashcat, pwntools, angr, z3,
   and many more).
-- **Multi-agent orchestration** -- priority queue, model selection, and
+- **Multi-agent orchestration** - priority queue, model selection, and
   parallel subagent coordination for solving challenges at scale.
 
 ## Architecture
@@ -31,7 +31,7 @@ workspace.
     |        |        |                   |         |        |        |
 ctf-buster ctf-crypto ctf-pwn    ctf-forensics  ctf-gdb  ctf-rev  ctf-jail
   (Rust)   (Python)   (Python)     (Python)     (Python) (Python) (Python)
- 15 tools  8 tools   10 tools      6 tools      5 tools  6 tools  4 tools
+ 15 tools  6 tools    7 tools      5 tools      4 tools  3 tools  4 tools
     |          |          |            |            |        |        |
  CTFd/rCTF  sympy,z3  radare2,pwn  binwalk,    GDB      radare2  pyjail
  platforms  crypto    ROPgadget    zsteg,PIL   batch     r2ghidra bashjail
@@ -46,7 +46,7 @@ domain-specific analysis, built on the
 ## Quick Start
 
 ```bash
-# Enter the dev shell (includes Rust toolchain, Python env, 160+ security tools)
+# Enter the dev shell (includes Rust toolchain, Python env, 90+ security tools)
 nix develop
 
 # Build the CLI
@@ -74,19 +74,20 @@ ctf submit "challenge-name" "flag{...}"
 |----------|-------------|
 | [Architecture](docs/architecture.md) | System design, module structure, platform abstraction |
 | [CLI Reference](docs/cli-reference.md) | All CLI commands with examples |
-| [MCP Tools](docs/mcp-tools.md) | All 50 tools across 6 MCP servers |
+| [MCP Tools](docs/mcp-tools.md) | All 44 tools across 7 MCP servers |
 | [Configuration](docs/configuration.md) | `.ctf.toml`, authentication, scaffold templates |
 | [Integration](docs/integration.md) | Claude Code setup and `.mcp.json` |
-| [Security Tools](docs/security-tools.md) | 160+ tools available in the Nix dev shell |
+| [Security Tools](docs/security-tools.md) | 90+ tools available in the Nix dev shell |
+| [Workflow](docs/workflow.md) | Orchestration loop, category approaches, subagent strategy |
 
 ## Development
 
 ```bash
 nix develop                        # Enter dev shell
 cargo build --release              # Build Rust CLI
-cargo test                         # Run Rust tests (163 tests)
+cargo test                         # Run Rust tests (165 tests)
 cargo clippy -- -W clippy::all     # Lint Rust
-pytest tools/tests/                # Run Python tests (405 tests)
+python3 -m pytest tools/tests/     # Run Python tests (396 tests)
 ```
 
 ## Platform Support

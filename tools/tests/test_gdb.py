@@ -1,4 +1,4 @@
-"""Tests for ctf_gdb.py — GDB script building, output parsing, and tool JSON output."""
+"""Tests for ctf_gdb.py, GDB script building, output parsing, and tool JSON output."""
 
 import json
 import os
@@ -24,7 +24,7 @@ gdb_trace_input = _unwrap(ctf_gdb.gdb_trace_input)
 gdb_checksec_runtime = _unwrap(ctf_gdb.gdb_checksec_runtime)
 
 
-# ── _build_gdb_script tests ──────────────────────────────────────────────────
+# -- _build_gdb_script tests --------------------------------------------------
 
 
 class TestBuildGdbScript:
@@ -58,7 +58,7 @@ class TestBuildGdbScript:
         assert "quit" in script
 
 
-# ── _parse_registers tests ───────────────────────────────────────────────────
+# -- _parse_registers tests --------------------------------------------------─
 
 
 class TestParseRegisters:
@@ -105,7 +105,7 @@ class TestParseRegisters:
         assert regs["rip"]["hex"] == "0x401000"
 
 
-# ── _parse_backtrace tests ───────────────────────────────────────────────────
+# -- _parse_backtrace tests --------------------------------------------------─
 
 
 class TestParseBacktrace:
@@ -129,7 +129,7 @@ class TestParseBacktrace:
         assert len(frames) == 1
 
 
-# ── _parse_memory tests ─────────────────────────────────────────────────────
+# -- _parse_memory tests ----------------------------------------------------─
 
 
 class TestParseMemory:
@@ -150,7 +150,7 @@ class TestParseMemory:
         assert len(lines) == 1
 
 
-# ── _write_temp tests ───────────────────────────────────────────────────────
+# -- _write_temp tests ------------------------------------------------------─
 
 
 class TestWriteTemp:
@@ -179,7 +179,7 @@ class TestWriteTemp:
             os.unlink(path)
 
 
-# ── gdb_run tool tests ──────────────────────────────────────────────────────
+# -- gdb_run tool tests ------------------------------------------------------
 
 
 class TestGdbRun:
@@ -235,7 +235,7 @@ class TestGdbRun:
             os.unlink(path)
 
 
-# ── gdb_break_inspect tool tests ────────────────────────────────────────────
+# -- gdb_break_inspect tool tests --------------------------------------------
 
 
 class TestGdbBreakInspect:
@@ -283,7 +283,7 @@ class TestGdbBreakInspect:
             os.unlink(path)
 
 
-# ── gdb_trace_input tool tests ──────────────────────────────────────────────
+# -- gdb_trace_input tool tests ----------------------------------------------
 
 
 class TestGdbTraceInput:
@@ -357,7 +357,7 @@ class TestGdbTraceInput:
             os.unlink(path)
 
 
-# ── gdb_checksec_runtime tool tests ─────────────────────────────────────────
+# -- gdb_checksec_runtime tool tests ----------------------------------------─
 
 
 class TestGdbChecksecRuntime:
@@ -388,7 +388,7 @@ class TestGdbChecksecRuntime:
             os.unlink(path)
 
 
-# ── Integration: all tools return valid JSON ────────────────────────────────
+# -- Integration: all tools return valid JSON --------------------------------
 
 
 class TestJsonOutput:
@@ -411,7 +411,7 @@ class TestJsonOutput:
         json.loads(raw)
 
 
-# ── TestGdbOutputParsing — mock-based GDB output parsing tests ──────────────
+# -- TestGdbOutputParsing, mock-based GDB output parsing tests --------------
 
 
 class TestGdbOutputParsing:

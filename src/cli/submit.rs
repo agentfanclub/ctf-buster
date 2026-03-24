@@ -50,7 +50,10 @@ pub async fn handle_submit(
   Ok(())
 }
 
-fn infer_challenge_from_cwd<'a>(challenges: &'a [Challenge], workspace_root: &Path) -> Result<&'a Challenge> {
+fn infer_challenge_from_cwd<'a>(
+  challenges: &'a [Challenge],
+  workspace_root: &Path,
+) -> Result<&'a Challenge> {
   let cwd = std::env::current_dir()?;
   let relative = cwd
     .strip_prefix(workspace_root)
@@ -58,10 +61,9 @@ fn infer_challenge_from_cwd<'a>(challenges: &'a [Challenge], workspace_root: &Pa
 
   // The last component of the relative path is the challenge name
   // e.g., crypto/andor -> "andor"
-  let challenge_name = relative
-    .file_name()
-    .and_then(|n| n.to_str())
-    .ok_or_else(|| Error::Workspace("Could not determine challenge from current directory".into()))?;
+  let challenge_name = relative.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    Error::Workspace("Could not determine challenge from current directory".into())
+  })?;
 
   let lower = challenge_name.to_lowercase();
   challenges

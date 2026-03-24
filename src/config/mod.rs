@@ -56,7 +56,8 @@ mod tests {
     let dir = TempDir::new().unwrap();
     let ws = dir.path().join("my-ctf");
     std::fs::create_dir_all(&ws).unwrap();
-    std::fs::write(ws.join(".ctf.toml"), "[platform]\nurl = \"x\"\n[workspace]\nname = \"t\"").unwrap();
+    std::fs::write(ws.join(".ctf.toml"), "[platform]\nurl = \"x\"\n[workspace]\nname = \"t\"")
+      .unwrap();
 
     let sub = ws.join("crypto/challenge1");
     std::fs::create_dir_all(&sub).unwrap();

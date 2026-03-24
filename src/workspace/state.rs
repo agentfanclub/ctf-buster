@@ -203,11 +203,16 @@ pub fn update_sync_full(workspace_root: &Path, challenges: &[Challenge]) -> Resu
     }
     if !c.hints.is_empty() {
       entry.hints = Some(
-        c.hints.iter().map(|h| CachedHint { id: h.id.clone(), content: h.content.clone(), cost: h.cost }).collect(),
+        c.hints
+          .iter()
+          .map(|h| CachedHint { id: h.id.clone(), content: h.content.clone(), cost: h.cost })
+          .collect(),
       );
     }
     if !c.files.is_empty() {
-      entry.files = Some(c.files.iter().map(|f| CachedFile { name: f.name.clone(), url: f.url.clone() }).collect());
+      entry.files = Some(
+        c.files.iter().map(|f| CachedFile { name: f.name.clone(), url: f.url.clone() }).collect(),
+      );
     }
     if !c.tags.is_empty() {
       entry.tags = Some(c.tags.clone());
@@ -231,7 +236,11 @@ pub fn merge_cached_details(challenges: &mut [Challenge], state: &WorkspaceState
         if let Some(hints) = &cached.hints {
           c.hints = hints
             .iter()
-            .map(|h| crate::platform::types::Hint { id: h.id.clone(), content: h.content.clone(), cost: h.cost })
+            .map(|h| crate::platform::types::Hint {
+              id: h.id.clone(),
+              content: h.content.clone(),
+              cost: h.cost,
+            })
             .collect();
         }
       }
@@ -239,7 +248,10 @@ pub fn merge_cached_details(challenges: &mut [Challenge], state: &WorkspaceState
         if let Some(files) = &cached.files {
           c.files = files
             .iter()
-            .map(|f| crate::platform::types::ChallengeFile { name: f.name.clone(), url: f.url.clone() })
+            .map(|f| crate::platform::types::ChallengeFile {
+              name: f.name.clone(),
+              url: f.url.clone(),
+            })
             .collect();
         }
       }
@@ -309,7 +321,10 @@ pub fn load_orchestration(workspace_root: &Path) -> Result<OrchestrationState> {
   Ok(state.orchestration)
 }
 
-pub fn update_orchestration(workspace_root: &Path, orchestration: OrchestrationState) -> Result<()> {
+pub fn update_orchestration(
+  workspace_root: &Path,
+  orchestration: OrchestrationState,
+) -> Result<()> {
   let mut state = load_state(workspace_root)?;
   state.orchestration = orchestration;
   write_state(workspace_root, &state)
@@ -374,7 +389,8 @@ mod tests {
     let dir = TempDir::new().unwrap();
     init_state(dir.path()).unwrap();
 
-    let challenges = vec![make_challenge("1", "Test A", "crypto"), make_challenge("2", "Test B", "web")];
+    let challenges =
+      vec![make_challenge("1", "Test A", "crypto"), make_challenge("2", "Test B", "web")];
     update_sync(dir.path(), &challenges).unwrap();
 
     let state = load_state(dir.path()).unwrap();
@@ -448,10 +464,15 @@ mod tests {
     let mut c = make_challenge("1", "Crypto 101", "crypto");
     c.description = "Solve this RSA problem".into();
     c.tags = vec!["easy".into()];
-    c.hints =
-      vec![crate::platform::types::Hint { id: "10".into(), content: Some("Think about factoring".into()), cost: 50 }];
-    c.files =
-      vec![crate::platform::types::ChallengeFile { name: "challenge.py".into(), url: "/files/challenge.py".into() }];
+    c.hints = vec![crate::platform::types::Hint {
+      id: "10".into(),
+      content: Some("Think about factoring".into()),
+      cost: 50,
+    }];
+    c.files = vec![crate::platform::types::ChallengeFile {
+      name: "challenge.py".into(),
+      url: "/files/challenge.py".into(),
+    }];
 
     update_sync_full(dir.path(), &[c]).unwrap();
 
@@ -608,7 +629,11 @@ mod tests {
         points: None,
         flag: None,
         description: Some("A web challenge".into()),
-        hints: Some(vec![CachedHint { id: "5".into(), content: Some("Check headers".into()), cost: 0 }]),
+        hints: Some(vec![CachedHint {
+          id: "5".into(),
+          content: Some("Check headers".into()),
+          cost: 0,
+        }]),
         files: None,
         tags: Some(vec!["easy".into()]),
         details_fetched_at: None,
@@ -625,7 +650,7 @@ mod tests {
     assert_eq!(challenges[0].tags, vec!["easy"]);
   }
 
-  // ── Orchestration state tests ──────────────────────────────────────────────
+  // -- Orchestration state tests -----------------------------------------------
 
   #[test]
   fn load_orchestration_empty_by_default() {
@@ -645,7 +670,12 @@ mod tests {
 
     let orch = OrchestrationState {
       queue: vec![
-        QueuedChallenge { name: "Easy RSA".into(), category: "crypto".into(), priority: 30, points: 100 },
+        QueuedChallenge {
+          name: "Easy RSA".into(),
+          category: "crypto".into(),
+          priority: 30,
+          points: 100,
+        },
         QueuedChallenge { name: "SQLi".into(), category: "web".into(), priority: 28, points: 200 },
       ],
       in_progress: vec![],
@@ -711,7 +741,12 @@ mod tests {
 
     // Set initial queue
     let orch1 = OrchestrationState {
-      queue: vec![QueuedChallenge { name: "A".into(), category: "web".into(), priority: 10, points: 100 }],
+      queue: vec![QueuedChallenge {
+        name: "A".into(),
+        category: "web".into(),
+        priority: 10,
+        points: 100,
+      }],
       in_progress: vec![],
       failed: vec![],
       updated_at: Some(Utc::now()),
@@ -748,7 +783,12 @@ mod tests {
 
     // Update orchestration
     let orch = OrchestrationState {
-      queue: vec![QueuedChallenge { name: "Test".into(), category: "web".into(), priority: 10, points: 100 }],
+      queue: vec![QueuedChallenge {
+        name: "Test".into(),
+        category: "web".into(),
+        priority: 10,
+        points: 100,
+      }],
       in_progress: vec![],
       failed: vec![],
       updated_at: Some(Utc::now()),
@@ -781,7 +821,10 @@ mod tests {
 
     let state = load_state(dir.path()).unwrap();
     let entry = &state.challenges["easy rsa"];
-    assert_eq!(entry.methodology.as_deref(), Some("Factored n using factordb, computed d, decrypted"));
+    assert_eq!(
+      entry.methodology.as_deref(),
+      Some("Factored n using factordb, computed d, decrypted")
+    );
     assert_eq!(entry.tools_used.as_ref().unwrap(), &["crypto_rsa_toolkit", "python"]);
   }
 
@@ -814,7 +857,7 @@ mod tests {
     assert_eq!(entry.tools_used.as_ref().unwrap().len(), 2);
   }
 
-  // ── Queue operation simulation tests ───────────────────────────────────────
+  // -- Queue operation simulation tests ----------------------------------------
   // These test the queue state machine operations that ctf_queue_update performs
 
   #[test]
@@ -852,8 +895,12 @@ mod tests {
     let dir = TempDir::new().unwrap();
     init_state(dir.path()).unwrap();
 
-    let mut orch =
-      OrchestrationState { queue: vec![], in_progress: vec!["A".into(), "B".into()], failed: vec![], updated_at: None };
+    let mut orch = OrchestrationState {
+      queue: vec![],
+      in_progress: vec!["A".into(), "B".into()],
+      failed: vec![],
+      updated_at: None,
+    };
 
     // Simulate "complete" action for A
     let name = "A";
@@ -901,7 +948,12 @@ mod tests {
     init_state(dir.path()).unwrap();
 
     let mut orch = OrchestrationState {
-      queue: vec![QueuedChallenge { name: "Other".into(), category: "web".into(), priority: 10, points: 100 }],
+      queue: vec![QueuedChallenge {
+        name: "Other".into(),
+        category: "web".into(),
+        priority: 10,
+        points: 100,
+      }],
       in_progress: vec![],
       failed: vec![FailedAttempt {
         name: "Hard Pwn".into(),
@@ -916,7 +968,12 @@ mod tests {
     let name_lower = "hard pwn".to_lowercase();
     if let Some(pos) = orch.failed.iter().position(|f| f.name.to_lowercase() == name_lower) {
       let failed = orch.failed.remove(pos);
-      orch.queue.push(QueuedChallenge { name: failed.name, category: failed.category, priority: -5, points: 0 });
+      orch.queue.push(QueuedChallenge {
+        name: failed.name,
+        category: failed.category,
+        priority: -5,
+        points: 0,
+      });
     }
     orch.updated_at = Some(Utc::now());
     update_orchestration(dir.path(), orch).unwrap();
@@ -967,7 +1024,12 @@ mod tests {
     init_state(dir.path()).unwrap();
 
     let mut orch = OrchestrationState {
-      queue: vec![QueuedChallenge { name: "A".into(), category: "crypto".into(), priority: 20, points: 100 }],
+      queue: vec![QueuedChallenge {
+        name: "A".into(),
+        category: "crypto".into(),
+        priority: 20,
+        points: 100,
+      }],
       in_progress: vec![],
       failed: vec![FailedAttempt {
         name: "Failed One".into(),
@@ -988,7 +1050,12 @@ mod tests {
       let max_priority = orch.queue.iter().map(|q| q.priority).max().unwrap_or(0);
       orch.queue.insert(
         0,
-        QueuedChallenge { name: failed.name, category: failed.category, priority: max_priority + 100, points: 0 },
+        QueuedChallenge {
+          name: failed.name,
+          category: failed.category,
+          priority: max_priority + 100,
+          points: 0,
+        },
       );
     }
     orch.updated_at = Some(Utc::now());
@@ -1007,7 +1074,12 @@ mod tests {
     init_state(dir.path()).unwrap();
 
     let orch = OrchestrationState {
-      queue: vec![QueuedChallenge { name: "A".into(), category: "crypto".into(), priority: 30, points: 100 }],
+      queue: vec![QueuedChallenge {
+        name: "A".into(),
+        category: "crypto".into(),
+        priority: 30,
+        points: 100,
+      }],
       in_progress: vec!["B".into()],
       failed: vec![FailedAttempt {
         name: "C".into(),
@@ -1028,10 +1100,13 @@ mod tests {
     assert!(loaded.failed.is_empty());
   }
 
-  // ── Auto-queue scoring algorithm tests ─────────────────────────────────────
+  // -- Auto-queue scoring algorithm tests --------------------------------------
   // These test the scoring logic from ctf_auto_queue by reproducing it directly
 
-  fn score_challenge(challenge: &Challenge, failed_names: &std::collections::HashSet<String>) -> i32 {
+  fn score_challenge(
+    challenge: &Challenge,
+    failed_names: &std::collections::HashSet<String>,
+  ) -> i32 {
     let cat = challenge.category.to_lowercase();
     let category_score: i32 = match cat.as_str() {
       "crypto" | "cryptography" => 10,
@@ -1052,7 +1127,11 @@ mod tests {
     };
 
     let solve_bonus: i32 =
-      if challenge.solves > 0 && (challenge.value as f64 / challenge.solves as f64) < 10.0 { 5 } else { 0 };
+      if challenge.solves > 0 && (challenge.value as f64 / challenge.solves as f64) < 10.0 {
+        5
+      } else {
+        0
+      };
 
     let mut priority = category_score + difficulty_bonus + solve_bonus;
 
@@ -1206,16 +1285,28 @@ mod tests {
       hints: vec![],
     };
     // All pwn aliases should score the same
-    assert_eq!(score_challenge(&make("pwn"), &empty), score_challenge(&make("binary exploitation"), &empty));
-    assert_eq!(score_challenge(&make("pwn"), &empty), score_challenge(&make("exploitation"), &empty));
+    assert_eq!(
+      score_challenge(&make("pwn"), &empty),
+      score_challenge(&make("binary exploitation"), &empty)
+    );
+    assert_eq!(
+      score_challenge(&make("pwn"), &empty),
+      score_challenge(&make("exploitation"), &empty)
+    );
     assert_eq!(score_challenge(&make("pwn"), &empty), score_challenge(&make("pwnable"), &empty));
 
     // All rev aliases
-    assert_eq!(score_challenge(&make("rev"), &empty), score_challenge(&make("reverse engineering"), &empty));
+    assert_eq!(
+      score_challenge(&make("rev"), &empty),
+      score_challenge(&make("reverse engineering"), &empty)
+    );
     assert_eq!(score_challenge(&make("rev"), &empty), score_challenge(&make("reversing"), &empty));
 
     // All misc aliases
-    assert_eq!(score_challenge(&make("misc"), &empty), score_challenge(&make("miscellaneous"), &empty));
+    assert_eq!(
+      score_challenge(&make("misc"), &empty),
+      score_challenge(&make("miscellaneous"), &empty)
+    );
     assert_eq!(score_challenge(&make("misc"), &empty), score_challenge(&make("trivia"), &empty));
   }
 
@@ -1312,11 +1403,16 @@ mod tests {
     assert_eq!(score_challenge(&c, &empty), 4);
   }
 
-  // ── Queued challenge / failed attempt serialization tests ──────────────────
+  // -- Queued challenge / failed attempt serialization tests -------------------
 
   #[test]
   fn queued_challenge_roundtrip() {
-    let qc = QueuedChallenge { name: "Easy RSA".into(), category: "crypto".into(), priority: 35, points: 100 };
+    let qc = QueuedChallenge {
+      name: "Easy RSA".into(),
+      category: "crypto".into(),
+      priority: 35,
+      points: 100,
+    };
     let json = serde_json::to_string(&qc).unwrap();
     let deserialized: QueuedChallenge = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized, qc);
@@ -1338,7 +1434,12 @@ mod tests {
   #[test]
   fn orchestration_state_roundtrip() {
     let orch = OrchestrationState {
-      queue: vec![QueuedChallenge { name: "A".into(), category: "crypto".into(), priority: 30, points: 100 }],
+      queue: vec![QueuedChallenge {
+        name: "A".into(),
+        category: "crypto".into(),
+        priority: 30,
+        points: 100,
+      }],
       in_progress: vec!["B".into()],
       failed: vec![FailedAttempt {
         name: "C".into(),
@@ -1355,7 +1456,7 @@ mod tests {
     assert_eq!(deserialized.failed, orch.failed);
   }
 
-  // ── Writeup generation tests ──────────────────────────────────────────────
+  // -- Writeup generation tests ------------------------------------------------
 
   #[test]
   fn save_writeup_preserves_existing_solved_fields() {

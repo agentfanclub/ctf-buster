@@ -1,4 +1,4 @@
-"""Tests for ctf_rev.py — radare2 output parsing, JSON handling, and tool output."""
+"""Tests for ctf_rev.py, radare2 output parsing, JSON handling, and tool output."""
 
 import json
 import os
@@ -23,7 +23,7 @@ rev_decompile = _unwrap(ctf_rev.rev_decompile)
 rev_strings_xrefs = _unwrap(ctf_rev.rev_strings_xrefs)
 
 
-# ── _parse_r2_json tests ────────────────────────────────────────────────────
+# -- _parse_r2_json tests ----------------------------------------------------
 
 
 class TestParseR2Json:
@@ -68,7 +68,7 @@ class TestParseR2Json:
         assert len(result[0]["funcs"]) == 2
 
 
-# ── _r2_cmd tests ───────────────────────────────────────────────────────────
+# -- _r2_cmd tests ----------------------------------------------------------─
 
 
 class TestR2Cmd:
@@ -80,7 +80,7 @@ class TestR2Cmd:
         assert "returncode" in result
 
 
-# ── rev_functions tool tests ─────────────────────────────────────────────────
+# -- rev_functions tool tests ------------------------------------------------─
 
 
 class TestR2Functions:
@@ -116,7 +116,7 @@ class TestR2Functions:
                 os.unlink(link_path)
 
 
-# ── rev_decompile tool tests ────────────────────────────────────────────────
+# -- rev_decompile tool tests ------------------------------------------------
 
 
 class TestR2Decompile:
@@ -169,7 +169,7 @@ class TestR2Decompile:
             os.unlink(path)
 
 
-# ── rev_strings_xrefs tool tests ────────────────────────────────────────────
+# -- rev_strings_xrefs tool tests --------------------------------------------
 
 
 class TestR2StringsXrefs:
@@ -194,14 +194,14 @@ class TestR2StringsXrefs:
             path = f.name
         try:
             result = json.loads(rev_strings_xrefs(path, filter="flag|password"))
-            # r2 may not be available in CI — accept either valid result or error
+            # r2 may not be available in CI, accept either valid result or error
             if "error" not in result:
                 assert result["filter"] == "flag|password"
         finally:
             os.unlink(path)
 
 
-# ── Integration: all tools return valid JSON ────────────────────────────────
+# -- Integration: all tools return valid JSON --------------------------------
 
 
 class TestJsonOutput:
@@ -220,7 +220,7 @@ class TestJsonOutput:
         json.loads(raw)
 
 
-# ── TestRevMocked — mock-based r2 output parsing tests ──────────────────────
+# -- TestRevMocked, mock-based r2 output parsing tests ----------------------
 
 
 class TestRevMocked:

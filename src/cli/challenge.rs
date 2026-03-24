@@ -43,7 +43,11 @@ pub async fn handle_list(
   Ok(())
 }
 
-pub async fn handle_show(platform: &dyn Platform, id_or_name: &str, challenges: &[Challenge]) -> Result<()> {
+pub async fn handle_show(
+  platform: &dyn Platform,
+  id_or_name: &str,
+  challenges: &[Challenge],
+) -> Result<()> {
   let challenge = resolve_challenge(platform, id_or_name, challenges).await?;
 
   println!("{} {}", "Challenge:".bold(), challenge.name.bold().cyan());
@@ -51,7 +55,11 @@ pub async fn handle_show(platform: &dyn Platform, id_or_name: &str, challenges: 
   println!("{} {}", "Points:   ".bold(), challenge.value);
   println!("{} {}", "Solves:   ".bold(), challenge.solves);
 
-  let status = if challenge.solved_by_me { "Solved".green().to_string() } else { "Unsolved".red().to_string() };
+  let status = if challenge.solved_by_me {
+    "Solved".green().to_string()
+  } else {
+    "Unsolved".red().to_string()
+  };
   println!("{} {status}", "Status:   ".bold());
 
   if !challenge.tags.is_empty() {
@@ -91,23 +99,29 @@ pub async fn resolve_challenge(
   id_or_name: &str,
   cached_challenges: &[Challenge],
 ) -> Result<Challenge> {
-  // Try numeric ID first
-  if id_or_name.parse::<u64>().is_ok() {
-    return platform.challenge(id_or_name).await;
-  }
-
-  // Try exact name match
+  // Try cached data first to avoid extra API calls (rCTF doesn't support /challs/{id})
   let lower = id_or_name.to_lowercase();
-  if let Some(c) = cached_challenges.iter().find(|c| c.name.to_lowercase() == lower) {
-    return platform.challenge(&c.id).await;
+
+  // Exact ID match in cache
+  if let Some(c) = cached_challenges.iter().find(|c| c.id == id_or_name) {
+    return Ok(c.clone());
   }
 
-  // Try fuzzy match (substring)
-  let matches: Vec<_> = cached_challenges.iter().filter(|c| c.name.to_lowercase().contains(&lower)).collect();
+  // Exact name match in cache
+  if let Some(c) = cached_challenges.iter().find(|c| c.name.to_lowercase() == lower) {
+    return Ok(c.clone());
+  }
+
+  // Fuzzy match (substring) in cache
+  let matches: Vec<_> =
+    cached_challenges.iter().filter(|c| c.name.to_lowercase().contains(&lower)).collect();
 
   match matches.len() {
-    0 => Err(crate::error::Error::ChallengeNotFound(id_or_name.to_string())),
-    1 => platform.challenge(&matches[0].id).await,
+    0 => {
+      // Cache miss, try fetching from platform
+      platform.challenge(id_or_name).await
+    }
+    1 => Ok(matches[0].clone()),
     _ => {
       let names: Vec<_> = matches.iter().map(|c| c.name.as_str()).collect();
       Err(crate::error::Error::ChallengeNotFound(format!(

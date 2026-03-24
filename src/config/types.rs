@@ -13,7 +13,7 @@ pub struct PlatformConfig {
   #[serde(rename = "type")]
   pub platform_type: Option<String>,
   pub url: String,
-  /// API token — if set here, used directly (no keyring/env needed).
+  /// API token. If set here, used directly (no keyring/env needed).
   /// Supports env var expansion: "${CTF_TOKEN}" resolves at runtime.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub token: Option<String>,

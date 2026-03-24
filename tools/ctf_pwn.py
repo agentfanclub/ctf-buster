@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CTF Pwn / Binary Exploitation MCP Server — triage, disassembly, ROP, pwntools."""
+"""CTF Pwn / Binary Exploitation MCP Server: triage, disassembly, ROP, pwntools."""
 
 import json
 import os
@@ -22,7 +22,7 @@ mcp = FastMCP(
 )
 
 
-# ── pwn_triage ────────────────────────────────────────────────────────────
+# -- pwn_triage ------------------------------------------------------------
 
 # Categorized dangerous functions for better triage output
 DANGEROUS_FUNCS_OVERFLOW = {
@@ -163,11 +163,11 @@ def _pwn_triage_impl(path: str) -> str:
 
 @mcp.tool()
 def pwn_triage(path: str) -> str:
-    """One-shot binary analysis — file type, checksec, imports/exports, dangerous functions, architecture."""
+    """One-shot binary analysis: file type, checksec, imports/exports, dangerous functions, architecture."""
     return _pwn_triage_impl(path)
 
 
-# ── pattern_offset ───────────────────────────────────────────────────────────
+# -- pattern_offset ----------------------------------------------------------─
 
 
 @mcp.tool()
@@ -189,7 +189,7 @@ def pwn_pattern_offset(
         )
     elif action == "find":
         if value.startswith("0x"):
-            # Hex value — convert to bytes
+            # Hex value, convert to bytes
             val_int = int(value, 16)
             val_bytes = val_int.to_bytes(4 if val_int < 0x100000000 else 8, "little")
         else:
@@ -208,7 +208,7 @@ def pwn_pattern_offset(
     return json.dumps({"error": f"Unknown action: {action}"}, indent=2)
 
 
-# ── shellcode_generate ───────────────────────────────────────────────────────
+# -- shellcode_generate ------------------------------------------------------─
 
 
 @mcp.tool()
@@ -276,7 +276,7 @@ def pwn_shellcode_generate(
             return json.dumps({"error": str(e)}, indent=2)
 
 
-# ── pwntools_template ───────────────────────────────────────────────────────
+# -- pwntools_template ------------------------------------------------------─
 
 
 @mcp.tool()
@@ -456,7 +456,7 @@ def pwn_pwntools_template(
     )
 
 
-# ── angr_analyze ─────────────────────────────────────────────────────────────
+# -- angr_analyze ------------------------------------------------------------─
 
 
 @mcp.tool()
@@ -478,7 +478,7 @@ def pwn_angr_analyze(
         import claripy
     except ImportError:
         return json.dumps(
-            {"error": "angr not available — install with: pip install angr"}
+            {"error": "angr not available, install with: pip install angr"}
         )
 
     try:
@@ -624,7 +624,7 @@ def pwn_angr_analyze(
     return json.dumps(result, indent=2)
 
 
-# ── libc_lookup ───────────────────────────────────────────────────────────────
+# -- libc_lookup --------------------------------------------------------------─
 
 
 @mcp.tool()
@@ -693,7 +693,7 @@ def pwn_libc_lookup(
     )
 
 
-# ── format_string ─────────────────────────────────────────────────────────────
+# -- format_string ------------------------------------------------------------─
 
 
 @mcp.tool()

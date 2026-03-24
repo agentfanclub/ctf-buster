@@ -1,4 +1,4 @@
-"""Tests for lib/subprocess_utils.py — run_tool, parse_checksec, safe_read_file."""
+"""Tests for lib/subprocess_utils.py, run_tool, parse_checksec, safe_read_file."""
 
 import os
 import sys
@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from lib.subprocess_utils import parse_checksec, run_tool, safe_read_file
 
-# ── run_tool tests ───────────────────────────────────────────────────────────
+# -- run_tool tests ----------------------------------------------------------─
 
 
 class TestRunTool:
@@ -65,7 +65,7 @@ class TestRunTool:
         assert lines[2] == "line3"
 
 
-# ── parse_checksec tests ─────────────────────────────────────────────────────
+# -- parse_checksec tests ----------------------------------------------------─
 
 
 class TestParseChecksec:
@@ -135,7 +135,7 @@ PIE: PIE enabled"""
         assert result["canary"] is True
 
 
-# ── safe_read_file tests ─────────────────────────────────────────────────────
+# -- safe_read_file tests ----------------------------------------------------─
 
 
 class TestSafeReadFile:
@@ -208,7 +208,7 @@ class TestSafeReadFile:
             os.unlink(path)
 
 
-# ── TestRunToolEdgeCases ────────────────────────────────────────────────────
+# -- TestRunToolEdgeCases ----------------------------------------------------
 
 
 class TestRunToolEdgeCases:
@@ -218,7 +218,7 @@ class TestRunToolEdgeCases:
         assert "not found" in result.get("error", "").lower()
 
 
-# ── TestSafeReadFileEdgeCases ───────────────────────────────────────────────
+# -- TestSafeReadFileEdgeCases ----------------------------------------------─
 
 
 class TestSafeReadFileEdgeCases:

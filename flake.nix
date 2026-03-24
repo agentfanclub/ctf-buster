@@ -43,7 +43,7 @@
             ];
           };
 
-          # Python 3.13 — packages needed by MCP servers + CTF workflows
+          # Python 3.13, packages needed by MCP servers + CTF workflows
           pythonEnv = pkgs.python313.withPackages (
             ps: with ps; [
               # MCP server framework
@@ -205,7 +205,7 @@
             RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
 
             shellHook = ''
-              echo "ctf-buster dev shell — Rust + Python MCP servers + CTF toolkit"
+              echo "ctf-buster dev shell: Rust + Python MCP servers + CTF toolkit"
             '';
           };
         };

@@ -64,7 +64,10 @@ impl MockPlatform {
         ScoreboardEntry { rank: 2, name: "Beta".into(), score: 800 },
         ScoreboardEntry { rank: 3, name: "Gamma".into(), score: 600 },
       ],
-      submit_results: Mutex::new(vec![SubmitResult::Correct { challenge: "test".into(), points: 100 }]),
+      submit_results: Mutex::new(vec![SubmitResult::Correct {
+        challenge: "test".into(),
+        points: 100,
+      }]),
     }
   }
 }

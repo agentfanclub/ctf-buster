@@ -33,6 +33,10 @@ Place in your workspace root:
     "ctf-rev": {
       "command": "python3",
       "args": ["./tools/ctf_rev.py"]
+    },
+    "ctf-jail": {
+      "command": "python3",
+      "args": ["./tools/ctf_jail.py"]
     }
   }
 }
@@ -47,20 +51,21 @@ claude mcp add -s user ctf-pwn -- python3 /path/to/tools/ctf_pwn.py
 claude mcp add -s user ctf-forensics -- python3 /path/to/tools/ctf_forensics.py
 claude mcp add -s user ctf-gdb -- python3 /path/to/tools/ctf_gdb.py
 claude mcp add -s user ctf-rev -- python3 /path/to/tools/ctf_rev.py
+claude mcp add -s user ctf-jail -- python3 /path/to/tools/ctf_jail.py
 ```
 
 ## Typical Workflow
 
-1. `ctf_workspace_status` -- understand the current competition state
-2. `ctf_challenges` -- browse available challenges
-3. `ctf_challenge_detail` -- read a specific challenge description
-4. `ctf_download_files` -- pull challenge attachments into the workspace
+1. `ctf_workspace_status` - understand the current competition state
+2. `ctf_challenges` - browse available challenges
+3. `ctf_challenge_detail` - read a specific challenge description
+4. `ctf_download_files` - pull challenge attachments into the workspace
 5. Use domain tools (`pwn_triage`, `forensics_file_triage`, `crypto_rsa_toolkit`, etc.)
-6. `ctf_submit_flag` -- submit the flag
+6. `ctf_submit_flag` - submit the flag
 
 ## Multi-Agent Orchestration
 
-See the orchestration strategy documented in [CLAUDE.md](../CLAUDE.md), which
+See the orchestration strategy documented in [workflow.md](workflow.md), which
 covers:
 - Priority-based challenge queue
 - Model selection per challenge type

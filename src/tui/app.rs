@@ -97,7 +97,13 @@ impl App {
   }
 
   pub fn total_points(&self) -> u32 {
-    self.state.challenges.values().filter(|c| c.status == ChallengeStatus::Solved).filter_map(|c| c.points).sum()
+    self
+      .state
+      .challenges
+      .values()
+      .filter(|c| c.status == ChallengeStatus::Solved)
+      .filter_map(|c| c.points)
+      .sum()
   }
 
   pub fn sorted_challenges(&self) -> Vec<&ChallengeState> {
@@ -117,7 +123,8 @@ impl App {
   }
 
   pub fn categories(&self) -> Vec<(String, usize, usize)> {
-    let mut cats: std::collections::BTreeMap<String, (usize, usize)> = std::collections::BTreeMap::new();
+    let mut cats: std::collections::BTreeMap<String, (usize, usize)> =
+      std::collections::BTreeMap::new();
     for c in self.state.challenges.values() {
       let entry = cats.entry(c.category.clone()).or_insert((0, 0));
       entry.1 += 1;
@@ -165,7 +172,12 @@ mod tests {
 
   use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-  fn make_challenge(name: &str, category: &str, status: ChallengeStatus, points: Option<u32>) -> ChallengeState {
+  fn make_challenge(
+    name: &str,
+    category: &str,
+    status: ChallengeStatus,
+    points: Option<u32>,
+  ) -> ChallengeState {
     ChallengeState {
       id: name.to_lowercase().replace(' ', "-"),
       name: name.into(),
@@ -205,7 +217,7 @@ mod tests {
     }
   }
 
-  // ── ActivePanel::next cycle tests ────────────────────────────────────────
+  // -- ActivePanel::next cycle tests ------------------------------------------
 
   #[test]
   fn active_panel_cycles_challenges_to_queue() {
@@ -222,7 +234,7 @@ mod tests {
     assert_eq!(ActivePanel::Notifications.next(), ActivePanel::Challenges);
   }
 
-  // ── solved_count tests ───────────────────────────────────────────────────
+  // -- solved_count tests -----------------------------------------------------
 
   #[test]
   fn solved_count_with_mixed_statuses() {
@@ -250,7 +262,7 @@ mod tests {
     assert_eq!(app.solved_count(), 0);
   }
 
-  // ── total_points tests ───────────────────────────────────────────────────
+  // -- total_points tests -----------------------------------------------------
 
   #[test]
   fn total_points_sums_only_solved() {
@@ -277,7 +289,7 @@ mod tests {
     assert_eq!(app.total_points(), 200);
   }
 
-  // ── sorted_challenges tests ──────────────────────────────────────────────
+  // -- sorted_challenges tests -------------------------------------------------
 
   #[test]
   fn sorted_challenges_by_status_then_category_then_name() {
@@ -296,7 +308,7 @@ mod tests {
     assert_eq!(sorted[3].name, "Zebra"); // Solved
   }
 
-  // ── categories tests ─────────────────────────────────────────────────────
+  // -- categories tests -------------------------------------------------------
 
   #[test]
   fn categories_groups_correctly() {
@@ -312,7 +324,7 @@ mod tests {
     assert_eq!(cats[1], ("web".into(), 1, 1)); // 1 solved, 1 total
   }
 
-  // ── handle_key tests ─────────────────────────────────────────────────────
+  // -- handle_key tests -------------------------------------------------------
 
   #[test]
   fn handle_key_q_quits() {

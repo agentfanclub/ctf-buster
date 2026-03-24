@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""CTF Reverse Engineering MCP Server — decompilation, xrefs, CFG, function analysis."""
+"""CTF Reverse Engineering MCP Server: decompilation, xrefs, CFG, function analysis."""
 
 import json
 import os
 import re
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "lib"))
+sys.path.insert(0, os.path.dirname(__file__))
 from fastmcp import FastMCP
-from subprocess_utils import run_tool
+from lib.subprocess_utils import run_tool
 
 mcp = FastMCP(
     "ctf-rev",
@@ -147,7 +147,7 @@ def rev_decompile(path: str, function: str = "main", decompiler: str = "auto") -
 
     return json.dumps(
         {
-            "error": f"Failed to decompile {function} — no decompiler produced output",
+            "error": f"Failed to decompile {function}, no decompiler produced output",
             "path": path,
         }
     )

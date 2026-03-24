@@ -21,8 +21,8 @@ priority = category_score + difficulty_bonus + solve_bonus
 
 category_score: crypto/forensics +10, web/jail +8, rev +6, misc +4, pwn +2
 difficulty_bonus: >50 solves +20, 20-50 +10, <20 +0
-solve_bonus: points/solves < 10 → +5
-failure_penalty: previously failed → -10
+solve_bonus: points/solves < 10 -> +5
+failure_penalty: previously failed -> -10
 ```
 
 Queue rules:
@@ -34,7 +34,7 @@ Queue rules:
 
 ## Orchestration Loop
 
-The main agent acts as an **orchestrator** — it does NOT solve challenges directly.
+The main agent acts as an **orchestrator**, it does NOT solve challenges directly.
 
 ```
 while unsolved challenges remain:
@@ -49,7 +49,7 @@ while unsolved challenges remain:
        subagent_type="general-purpose",
        run_in_background=true
      )
-  5. Do NOT wait — loop back to step 1 immediately.
+  5. Do NOT wait, loop back to step 1 immediately.
   6. When a batch completes, review results and continue launching.
 ```
 
@@ -91,21 +91,21 @@ Never hold a flag. `ctf_submit_flag` returns correct/incorrect safely.
 
 ## Category-Specific Approaches
 
-**Crypto:** crypto_identify → crypto_transform_chain / crypto_rsa_toolkit / crypto_math_solve / crypto_xor_analyze. SageMath/hashcat from bash.
+**Crypto:** crypto_identify -> crypto_transform_chain / crypto_rsa_toolkit / crypto_math_solve / crypto_xor_analyze. SageMath/hashcat from bash.
 
-**Pwn:** pwn_triage → rev_decompile → gdb_trace_input / pwn_format_string / pwn_angr_analyze. ROPgadget/one_gadget from bash.
+**Pwn:** pwn_triage -> rev_decompile -> gdb_trace_input / pwn_format_string / pwn_angr_analyze. ROPgadget/one_gadget from bash.
 
-**Rev:** rev_functions → rev_decompile → rev_strings_xrefs → gdb_break_inspect. r2/radiff2 from bash.
+**Rev:** rev_functions -> rev_decompile -> rev_strings_xrefs -> gdb_break_inspect. r2/radiff2 from bash.
 
-**Forensics:** forensics_file_triage → forensics_stego_analyze / forensics_extract_embedded / forensics_entropy_analysis / forensics_image_analysis. volatility3 from bash.
+**Forensics:** forensics_file_triage -> forensics_stego_analyze / forensics_extract_embedded / forensics_entropy_analysis / forensics_image_analysis. volatility3 from bash.
 
-**Web:** curl, sqlmap, ffuf, nuclei, nikto from bash.
+**Web:** curl, sqlmap, ffuf, nikto, whatweb from bash.
 
-**Jail:** Read source → jail_analyze_source → jail_find_subclass_chain / jail_construct_string / jail_build_payload. Test via pwntools.
+**Jail:** Read source -> jail_analyze_source -> jail_find_subclass_chain / jail_construct_string / jail_build_payload. Test via pwntools.
 
 ## Incremental Work & Retries
 
-- Read solve.py first — may contain prior work
+- Read solve.py first, it may contain prior work
 - Edit incrementally, keep it runnable
 - Even failed attempts should leave useful code
 - Submit first, polish after

@@ -36,7 +36,7 @@ pub async fn create_platform(config: &PlatformConfig, token: &str) -> Result<Box
 }
 
 async fn detect_platform(config: &PlatformConfig, token: &str) -> Result<Box<dyn Platform>> {
-  // Try CTFd first — construct platform and probe whoami
+  // Try CTFd first: construct platform and probe whoami
   let ctfd = ctfd::CtfdPlatform::new(config.url.clone(), token.to_string());
   if ctfd.whoami().await.is_ok() {
     tracing::info!("Auto-detected CTFd platform");

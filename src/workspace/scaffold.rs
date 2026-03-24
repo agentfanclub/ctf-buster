@@ -6,7 +6,11 @@ use crate::platform::types::Challenge;
 use crate::workspace::state::ChallengeState;
 
 /// Returns the directory path for a challenge based on the scaffold template.
-pub fn challenge_dir(workspace_root: &Path, challenge: &Challenge, config: &ScaffoldConfig) -> PathBuf {
+pub fn challenge_dir(
+  workspace_root: &Path,
+  challenge: &Challenge,
+  config: &ScaffoldConfig,
+) -> PathBuf {
   let path = config
     .template
     .replace("{category}", &sanitize_name(&challenge.category))
@@ -15,7 +19,11 @@ pub fn challenge_dir(workspace_root: &Path, challenge: &Challenge, config: &Scaf
 }
 
 /// Scaffold a challenge directory. Returns true if the directory was newly created.
-pub fn scaffold_challenge(workspace_root: &Path, challenge: &Challenge, config: &ScaffoldConfig) -> Result<bool> {
+pub fn scaffold_challenge(
+  workspace_root: &Path,
+  challenge: &Challenge,
+  config: &ScaffoldConfig,
+) -> Result<bool> {
   let dir = challenge_dir(workspace_root, challenge, config);
 
   if dir.exists() {
@@ -351,7 +359,11 @@ mod tests {
   #[test]
   fn challenge_dir_custom_template() {
     let c = make_challenge("Easy RSA", "Crypto");
-    let config = ScaffoldConfig { template: "{name}".into(), create_solve_file: false, create_notes_file: false };
+    let config = ScaffoldConfig {
+      template: "{name}".into(),
+      create_solve_file: false,
+      create_notes_file: false,
+    };
     let dir = challenge_dir(Path::new("/ws"), &c, &config);
     assert_eq!(dir, Path::new("/ws/easy-rsa"));
   }
@@ -375,7 +387,11 @@ mod tests {
   fn scaffold_creates_files_when_enabled() {
     let dir = TempDir::new().unwrap();
     let c = make_challenge("Test", "Web");
-    let config = ScaffoldConfig { create_solve_file: true, create_notes_file: true, ..ScaffoldConfig::default() };
+    let config = ScaffoldConfig {
+      create_solve_file: true,
+      create_notes_file: true,
+      ..ScaffoldConfig::default()
+    };
 
     let created = scaffold_challenge(dir.path(), &c, &config).unwrap();
     assert!(created);
@@ -503,7 +519,7 @@ mod tests {
     assert!(content.contains("**Points:** 100"));
   }
 
-  // ── generate_writeup tests ─────────────────────────────────────────────
+  // -- generate_writeup tests --------------------------------------------------
 
   fn make_challenge_state(
     name: &str,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CTF Jail Escape MCP Server — pyjail and bash jail analysis, bypass payload generation."""
+"""CTF Jail Escape MCP Server: pyjail and bash jail analysis, bypass payload generation."""
 
 import ast
 import json
@@ -245,7 +245,7 @@ def _analyze_python_source(source: str) -> dict:
             for c in candidate:
                 blocked_chars.add(c)
 
-    # Detect whitelist patterns (allowed chars — everything else is blocked)
+    # Detect whitelist patterns (allowed chars, everything else is blocked)
     for m in re.finditer(
         r"""(?:allowed|whitelist|safe)\w*\s*=\s*["\']([^"\']+)["\']""",
         source,
@@ -464,7 +464,7 @@ def _analyze_bash_source(source: str) -> dict:
 
 @mcp.tool()
 def jail_analyze_source(source: str, jail_type: str = "auto") -> str:
-    """Analyze jail source code — finds blocked strings/chars, restriction type, and suggests bypasses."""
+    """Analyze jail source code: finds blocked strings/chars, restriction type, and suggests bypasses."""
     if not source.strip():
         return json.dumps({"error": "Empty source code"})
 
@@ -948,7 +948,7 @@ _PY_PAYLOAD_TEMPLATES = {
             ),
             "technique": "subclass_builtins_recovery",
             "note": "Recovers __builtins__ dict from a subclass's globals. "
-            "Index varies by Python version — use jail_find_subclass_chain to find it.",
+            "Index varies by Python version; use jail_find_subclass_chain to find it.",
         },
         {
             "template": "breakpoint()",
@@ -1067,7 +1067,7 @@ _BASH_PAYLOAD_TEMPLATES = {
         {
             "template": "$0",
             "technique": "dollar_zero",
-            "note": "$0 is the current shell — spawns new instance",
+            "note": "$0 is the current shell, spawns new instance",
         },
         {
             "template": "/???/??",

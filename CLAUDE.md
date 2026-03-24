@@ -5,18 +5,18 @@ AI-powered CTF competition toolkit. Rust CLI + 7 MCP servers (44 tools total).
 ## Architecture
 
 ```
-ctf-buster (Rust)      — 15 tools: platform interaction (CTFd/rCTF), queue management, auto-orchestration, writeups
-ctf-crypto (Python)    — 8 tools: encoding chains, RSA attacks, constraint solving, XOR analysis
-ctf-pwn (Python)       — 10 tools: triage, disassembly, ROP, pwntools, angr, format strings, libc
-ctf-forensics (Python) — 6 tools: file analysis, stego, extraction, entropy
-ctf-gdb (Python)       — 5 tools: GDB dynamic analysis, breakpoints, input tracing
-ctf-rev (Python)       — 6 tools: decompilation, xrefs, CFG, function analysis
-ctf-jail (Python)      — 4 tools: pyjail/bashjail analysis, bypass payloads, subclass chains
+ctf-buster (Rust)      - 15 tools: platform interaction (CTFd/rCTF), queue management, auto-orchestration, writeups
+ctf-crypto (Python)    -  6 tools: encoding chains, RSA attacks, constraint solving, XOR analysis
+ctf-pwn (Python)       -  7 tools: triage, shellcode, ROP, pwntools, angr, format strings, libc
+ctf-forensics (Python) -  5 tools: file analysis, stego, extraction, entropy, image analysis
+ctf-gdb (Python)       -  4 tools: GDB dynamic analysis, breakpoints, input tracing, runtime checksec
+ctf-rev (Python)       -  3 tools: decompilation, function listing, string xrefs
+ctf-jail (Python)      -  4 tools: pyjail/bashjail analysis, bypass payloads, subclass chains
 ```
 
 ## CTF Workflow (Quick Reference)
 
-Orchestrator loop: `ctf_sync(full=true)` → `ctf_auto_queue()` → `ctf_generate_solve_prompt(count=10)` → read prompt files → launch subagents with `run_in_background=true` → loop.
+Orchestrator loop: `ctf_sync(full=true)` -> `ctf_auto_queue()` -> `ctf_generate_solve_prompt(count=10)` -> read prompt files -> launch subagents with `run_in_background=true` -> loop.
 
 When asked to "solve this CTF", execute the loop immediately without confirmation.
 
@@ -42,12 +42,14 @@ src/                    Rust CLI + MCP server
   tui/                  TUI dashboard (ratatui)
   platform/             CTFd + rCTF API clients
   workspace/            Scaffolding + state management
+  output/               Table formatting for CLI display
 tools/                  Python MCP servers
   ctf_crypto.py         Crypto & encoding server
   ctf_pwn.py            Binary analysis server
   ctf_forensics.py      Forensics & stego server
   ctf_gdb.py            GDB dynamic analysis server
   ctf_rev.py            Reverse engineering server
+  ctf_jail.py           Jail escape server
   lib/                  Shared subprocess utilities
   tests/                Python test suite
 docs/                   Extended documentation

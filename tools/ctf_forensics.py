@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""CTF Forensics & Steganography MCP Server — file analysis, stego, data extraction."""
+"""CTF Forensics & Steganography MCP Server: file analysis, stego, data extraction."""
 
 import json
 import math
 import os
 import re
-import shlex
 import sys
 import tempfile
 
@@ -24,12 +23,12 @@ mcp = FastMCP(
 )
 
 
-# ── file_triage ──────────────────────────────────────────────────────────────
+# -- file_triage --------------------------------------------------------------
 
 
 @mcp.tool()
 def forensics_file_triage(path: str) -> str:
-    """Comprehensive one-shot file analysis — runs file, exiftool, binwalk, strings.
+    """Comprehensive one-shot file analysis: runs file, exiftool, binwalk, strings.
 
     Returns file type, metadata, embedded data signatures, interesting strings,
     file size, and overall entropy.
@@ -178,12 +177,12 @@ def _check_trailing_data(path, mime_type):
     return {"found": False}
 
 
-# ── stego_analyze ────────────────────────────────────────────────────────────
+# -- stego_analyze ------------------------------------------------------------
 
 
 @mcp.tool()
 def forensics_stego_analyze(path: str, password: str = "") -> str:
-    """Systematic stego analysis — tries all applicable tools (zsteg, steghide, jsteg, etc.) for the file type."""
+    """Systematic stego analysis: tries all applicable tools (zsteg, steghide, jsteg, etc.) for the file type."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})
@@ -220,7 +219,7 @@ def forensics_stego_analyze(path: str, password: str = "") -> str:
 def _stego_png(path):
     findings = []
 
-    # zsteg — comprehensive PNG stego analysis
+    # zsteg, comprehensive PNG stego analysis
     r = run_tool(["zsteg", path, "--all"], timeout=30)
     if r["returncode"] == 0:
         for line in r["stdout"].splitlines():
@@ -231,7 +230,7 @@ def _stego_png(path):
             if ".." in line:
                 method, _, data = line.partition("..")
                 data = data.strip()
-                # Filter out noise — only report meaningful findings
+                # Filter out noise, only report meaningful findings
                 if len(data) > 3 and not all(c in " .~" for c in data[:20]):
                     confidence = 0.5
                     if any(
@@ -372,7 +371,7 @@ def _stego_gif(path):
                     {
                         "tool": "exiftool",
                         "method": "multi_frame_gif",
-                        "data": f"GIF has {frames} frames — check individual frames for hidden data",
+                        "data": f"GIF has {frames} frames, check individual frames for hidden data",
                         "confidence": 0.4,
                     }
                 )
@@ -435,7 +434,7 @@ def _try_steghide(path, password):
     return findings
 
 
-# ── extract_embedded ─────────────────────────────────────────────────────────
+# -- extract_embedded --------------------------------------------------------─
 
 
 @mcp.tool()
@@ -505,7 +504,7 @@ def forensics_extract_embedded(path: str) -> str:
     )
 
 
-# ── entropy_analysis ─────────────────────────────────────────────────────────
+# -- entropy_analysis --------------------------------------------------------─
 
 
 def _calculate_entropy(data):
@@ -526,17 +525,17 @@ def _calculate_entropy(data):
 
 def _entropy_interpretation(entropy):
     if entropy < 1.0:
-        return "Very low — likely mostly empty/padding"
+        return "Very low, likely mostly empty/padding"
     elif entropy < 3.5:
-        return "Low — likely plaintext or simple data"
+        return "Low, likely plaintext or simple data"
     elif entropy < 5.0:
-        return "Medium — structured data, possibly compressed text"
+        return "Medium, structured data, possibly compressed text"
     elif entropy < 7.0:
-        return "High — likely compressed data"
+        return "High, likely compressed data"
     elif entropy < 7.9:
-        return "Very high — likely encrypted or compressed"
+        return "Very high, likely encrypted or compressed"
     else:
-        return "Near maximum — encrypted or random data"
+        return "Near maximum, encrypted or random data"
 
 
 @mcp.tool()
@@ -570,7 +569,7 @@ def forensics_entropy_analysis(path: str, block_size: int = 4096) -> str:
                     "entropy_change": round(diff, 4),
                     "from": blocks[i - 1]["entropy"],
                     "to": blocks[i]["entropy"],
-                    "note": "Significant entropy change — possible boundary between data types",
+                    "note": "Significant entropy change, possible boundary between data types",
                 }
             )
 
@@ -597,12 +596,12 @@ def forensics_entropy_analysis(path: str, block_size: int = 4096) -> str:
     )
 
 
-# ── image_analysis ───────────────────────────────────────────────────────────
+# -- image_analysis ----------------------------------------------------------─
 
 
 @mcp.tool()
 def forensics_image_analysis(path: str, extract_lsb: bool = False) -> str:
-    """Deep image analysis — channel separation, LSB extraction, palette, histogram anomalies.
+    """Deep image analysis: channel separation, LSB extraction, palette, histogram anomalies.
 
     Args:
         path: Path to the image file
@@ -711,7 +710,7 @@ def forensics_image_analysis(path: str, extract_lsb: bool = False) -> str:
         zero_bins = sum(1 for v in h if v == 0)
         if zero_bins > 200:
             result.setdefault("histogram_anomalies", []).append(
-                f"{name} channel has {zero_bins}/256 empty bins — possible data hiding or manipulation"
+                f"{name} channel has {zero_bins}/256 empty bins, possible data hiding or manipulation"
             )
 
     return json.dumps(result, indent=2)

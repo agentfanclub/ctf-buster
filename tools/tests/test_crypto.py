@@ -1,4 +1,4 @@
-"""Tests for ctf_crypto.py — pure-Python functions only (no external CLI tools)."""
+"""Tests for ctf_crypto.py, pure-Python functions only (no external CLI tools)."""
 
 import hashlib
 import json
@@ -21,12 +21,12 @@ def _unwrap(tool):
     return getattr(tool, "fn", tool)
 
 
-# Decorated @mcp.tool functions — unwrap for direct calling in tests
+# Decorated @mcp.tool functions, unwrap for direct calling in tests
 transform_chain = _unwrap(ctf_crypto.crypto_transform_chain)
 crypto_identify = _unwrap(ctf_crypto.crypto_identify)
 frequency_analysis = _unwrap(ctf_crypto.crypto_frequency_analysis)
 
-# ── _apply_op tests ──────────────────────────────────────────────────────────
+# -- _apply_op tests ----------------------------------------------------------
 
 
 class TestApplyOpBase64:
@@ -43,7 +43,7 @@ class TestApplyOpBase64:
         assert decoded == original
 
     def test_base64_decode_no_padding(self):
-        # "Hello" base64 is "SGVsbG8=" — test without the padding
+        # "Hello" base64 is "SGVsbG8=", test without the padding
         assert _apply_op("SGVsbG8", "base64_decode") == "Hello"
 
     def test_base64_encode_empty(self):
@@ -261,7 +261,7 @@ class TestApplyOpUnknown:
             _apply_op("data", "nonexistent_op")
 
 
-# ── transform_chain tests ────────────────────────────────────────────────────
+# -- transform_chain tests ----------------------------------------------------
 
 
 class TestTransformChain:
@@ -319,7 +319,7 @@ class TestTransformChain:
         assert "final" in parsed
 
 
-# ── crypto_identify tests ────────────────────────────────────────────────────
+# -- crypto_identify tests ----------------------------------------------------
 
 
 class TestCryptoIdentify:
@@ -411,7 +411,7 @@ class TestCryptoIdentify:
         assert all("type" in r and "confidence" in r for r in parsed)
 
 
-# ── frequency_analysis tests ─────────────────────────────────────────────────
+# -- frequency_analysis tests ------------------------------------------------─
 
 
 class TestFrequencyAnalysis:
@@ -475,7 +475,7 @@ class TestFrequencyAnalysis:
         assert "character_frequencies" in parsed
 
 
-# ── crypto_rsa_toolkit tests ─────────────────────────────────────────────────
+# -- crypto_rsa_toolkit tests ------------------------------------------------─
 
 rsa_toolkit = _unwrap(ctf_crypto.crypto_rsa_toolkit)
 
@@ -549,7 +549,7 @@ class TestRsaToolkitFermat:
     """Tests for Fermat factorization (when p and q are close)."""
 
     def test_fermat_close_primes(self):
-        # Two primes close together — Fermat should factor quickly
+        # Two primes close together, Fermat should factor quickly
         p, q = 1000000007, 1000000009
         n = p * q
         result = json.loads(rsa_toolkit(str(n), attack="fermat"))
@@ -568,7 +568,7 @@ class TestRsaToolkitFermat:
         assert result["m"] == str(m)
 
     def test_fermat_fails_for_distant_primes(self):
-        # Very distant primes — Fermat won't factor in 10k iterations
+        # Very distant primes, Fermat won't factor in 10k iterations
         p, q = 7, 1000000007
         n = p * q
         result = json.loads(rsa_toolkit(str(n), attack="fermat"))
@@ -624,7 +624,7 @@ class TestRsaToolkitAuto:
 
     def test_auto_returns_attacks_tried_on_failure(self):
         # A hard case that no attack will solve quickly
-        n = 2**127 - 1  # Mersenne prime — not a product of two factors
+        n = 2**127 - 1  # Mersenne prime, not a product of two factors
         result = json.loads(rsa_toolkit(str(n), e=65537, c="42", attack="auto"))
         assert "attacks_tried" in result
         assert len(result["attacks_tried"]) > 0
@@ -634,7 +634,7 @@ class TestRsaToolkitAuto:
         assert result["n_bits"] == (3233).bit_length()
 
 
-# ── crypto_math_solve tests ──────────────────────────────────────────────────
+# -- crypto_math_solve tests --------------------------------------------------
 
 math_solve = _unwrap(ctf_crypto.crypto_math_solve)
 
@@ -721,7 +721,7 @@ class TestMathSolveUnknownMode:
         assert "error" in result
 
 
-# ── crypto_xor_analyze tests ────────────────────────────────────────────────
+# -- crypto_xor_analyze tests ------------------------------------------------
 
 xor_analyze = _unwrap(ctf_crypto.crypto_xor_analyze)
 
@@ -815,7 +815,7 @@ class TestXorAnalyzeEdgeCases:
         assert "data_length" in result
 
 
-# ── TestCryptoIdentifyCaesar ────────────────────────────────────────────────
+# -- TestCryptoIdentifyCaesar ------------------------------------------------
 
 
 class TestCryptoIdentifyCaesar:
@@ -835,7 +835,7 @@ class TestCryptoIdentifyCaesar:
         assert isinstance(idents, list)
 
 
-# ── TestCryptoRsaFactordbMocked ─────────────────────────────────────────────
+# -- TestCryptoRsaFactordbMocked --------------------------------------------─
 
 
 class TestCryptoRsaFactordbMocked:

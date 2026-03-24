@@ -50,8 +50,8 @@ using a session cookie instead of an API token, the client automatically:
 ### Environment variable expansion
 
 The `token` field in `.ctf.toml` supports:
-- `${VAR}` -- expand to the value of environment variable `VAR`
-- `${VAR:-default}` -- expand to `VAR` or `default` if unset
+- `${VAR}` - expand to the value of environment variable `VAR`
+- `${VAR:-default}` - expand to `VAR` or `default` if unset
 
 ## Scaffold Template Variables
 

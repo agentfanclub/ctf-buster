@@ -1,6 +1,6 @@
 # Security Toolkit
 
-The `nix develop` shell provides **80+ pre-configured security tools**
+The `nix develop` shell provides **90+ pre-configured security tools and packages**
 across all major CTF categories. All tools are declared in `flake.nix`
 and available after running `nix develop`.
 
@@ -16,7 +16,7 @@ and available after running `nix develop`.
 | Crypto | hashcat, john, haiti, hash-identifier, SageMath |
 | Networking | nmap, wireshark-cli, tcpdump, masscan, rustscan, mitmproxy, netcat, socat |
 | OSINT | amass, subfinder, theharvester, sherlock, recon-ng, gitleaks, trufflehog |
-| Password attacks | hydra, medusa, crowbar, kerbrute, hashcat, john |
+| Password attacks | hydra, medusa, crowbar, kerbrute |
 | Utilities | curl, jq, rlwrap, strace, ltrace, docker, xxd, seclists |
 
 ## Python Packages

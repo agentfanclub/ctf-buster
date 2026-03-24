@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CTF Crypto & Encoding MCP Server — transform chains, RSA attacks, constraint solving."""
+"""CTF Crypto & Encoding MCP Server: transform chains, RSA attacks, constraint solving."""
 
 import base64
 import codecs
@@ -27,7 +27,7 @@ mcp = FastMCP(
 )
 
 
-# ── transform_chain ──────────────────────────────────────────────────────────
+# -- transform_chain ----------------------------------------------------------
 
 
 def _apply_op(data: str, op: str) -> str:
@@ -145,7 +145,7 @@ def crypto_transform_chain(data: str, operations: list[str]) -> str:
     return json.dumps({"steps": steps, "final": current}, indent=2)
 
 
-# ── crypto_identify ──────────────────────────────────────────────────────────
+# -- crypto_identify ----------------------------------------------------------
 
 HASH_PATTERNS = {
     32: ["MD5", "NTLM"],
@@ -280,7 +280,7 @@ def crypto_identify(data: str) -> str:
     return json.dumps(results, indent=2)
 
 
-# ── rsa_toolkit ──────────────────────────────────────────────────────────────
+# -- rsa_toolkit --------------------------------------------------------------
 
 
 @mcp.tool()
@@ -346,7 +346,7 @@ def crypto_rsa_toolkit(
                     return json.dumps(results, indent=2)
 
         elif atk == "fermat":
-            # Fermat factorization — works when p and q are close
+            # Fermat factorization, works when p and q are close
             a = sympy.integer_nthroot(n_int, 2)[0] + 1
             for _ in range(10000):
                 b2 = a * a - n_int
@@ -374,7 +374,7 @@ def crypto_rsa_toolkit(
                 a += 1
 
         elif atk == "wiener":
-            # Wiener's attack — works when d is small
+            # Wiener's attack, works when d is small
             cf = []
             num, den = e, n_int
             while den:
@@ -456,7 +456,7 @@ def crypto_rsa_toolkit(
     return json.dumps(results, indent=2)
 
 
-# ── math_solve ───────────────────────────────────────────────────────────────
+# -- math_solve --------------------------------------------------------------─
 
 
 @mcp.tool()
@@ -530,7 +530,7 @@ def crypto_math_solve(mode: str, expression: str, variables: str = "") -> str:
     return json.dumps({"error": f"Unknown mode: {mode}"}, indent=2)
 
 
-# ── frequency_analysis ───────────────────────────────────────────────────────
+# -- frequency_analysis ------------------------------------------------------─
 
 
 @mcp.tool()
@@ -617,7 +617,7 @@ def crypto_frequency_analysis(text: str) -> str:
     )
 
 
-# ── xor_analyze ───────────────────────────────────────────────────────────────
+# -- xor_analyze --------------------------------------------------------------─
 
 # English letter frequencies (shared with frequency_analysis)
 _ENGLISH_FREQ = {
@@ -716,7 +716,7 @@ def crypto_xor_analyze(
     known_plaintext_hex: str = "",
     max_key_length: int = 32,
 ) -> str:
-    """XOR analysis — key recovery from known plaintext, key length estimation, single-byte brute force."""
+    """XOR analysis: key recovery from known plaintext, key length estimation, single-byte brute force."""
     try:
         data = bytes.fromhex(
             data_hex.replace(" ", "").replace("0x", "").replace("\\x", "")

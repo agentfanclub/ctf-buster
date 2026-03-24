@@ -40,9 +40,10 @@ impl CtfdPlatform {
         && !token.chars().all(|c| c.is_ascii_hexdigit())
     };
     let (auth, client) = if is_session_cookie {
-      // Session cookie — build client with cookie jar
+      // Session cookie: build client with cookie jar
       let jar = Arc::new(reqwest::cookie::Jar::default());
-      let url_parsed: url::Url = base_url.parse().unwrap_or_else(|_| "http://localhost".parse().unwrap());
+      let url_parsed: url::Url =
+        base_url.parse().unwrap_or_else(|_| "http://localhost".parse().unwrap());
       jar.add_cookie_str(&format!("session={token}"), &url_parsed);
       let client = Client::builder().cookie_provider(jar).build().unwrap_or_default();
       (AuthMethod::Session, client)
@@ -107,7 +108,9 @@ impl CtfdPlatform {
 
     let ids: std::collections::HashSet<String> = data
       .iter()
-      .filter_map(|solve| solve.get("challenge_id").and_then(|id| id.as_u64()).map(|id| id.to_string()))
+      .filter_map(|solve| {
+        solve.get("challenge_id").and_then(|id| id.as_u64()).map(|id| id.to_string())
+      })
       .collect();
 
     Ok(ids)
@@ -152,7 +155,7 @@ impl CtfdPlatform {
   async fn post(&self, path: &str, payload: &serde_json::Value) -> Result<serde_json::Value> {
     let result = self.post_inner(path, payload).await;
 
-    // On 403 with session auth, the CSRF nonce may have expired — refresh and retry once
+    // On 403 with session auth, the CSRF nonce may have expired; refresh and retry once
     if matches!(self.auth, AuthMethod::Session) {
       if let Err(Error::Platform(ref msg)) = result {
         if msg.contains("403") {
@@ -166,7 +169,8 @@ impl CtfdPlatform {
   }
 
   async fn post_inner(&self, path: &str, payload: &serde_json::Value) -> Result<serde_json::Value> {
-    let mut req = self.client.post(self.api_url(path)).header("Content-Type", "application/json").json(payload);
+    let mut req =
+      self.client.post(self.api_url(path)).header("Content-Type", "application/json").json(payload);
     req = self.apply_auth(req);
     // Session auth requires CSRF nonce on POST requests
     if matches!(self.auth, AuthMethod::Session) {
@@ -229,7 +233,12 @@ impl From<CtfdChallenge> for Challenge {
         .files
         .into_iter()
         .map(|url| {
-          let name = url.split('/').next_back().and_then(|s| s.split('?').next()).unwrap_or("unknown").to_string();
+          let name = url
+            .split('/')
+            .next_back()
+            .and_then(|s| s.split('?').next())
+            .unwrap_or("unknown")
+            .to_string();
           ChallengeFile { name, url }
         })
         .collect(),
@@ -237,7 +246,9 @@ impl From<CtfdChallenge> for Challenge {
         .tags
         .into_iter()
         .filter_map(|t| {
-          t.as_str().map(|s| s.to_string()).or_else(|| t.get("value").and_then(|v| v.as_str()).map(|s| s.to_string()))
+          t.as_str()
+            .map(|s| s.to_string())
+            .or_else(|| t.get("value").and_then(|v| v.as_str()).map(|s| s.to_string()))
         })
         .collect(),
       hints: c.hints.into_iter().map(|h| h.into()).collect(),
@@ -264,8 +275,9 @@ impl Platform for CtfdPlatform {
 
     let name = data.get("name").and_then(|n| n.as_str()).unwrap_or("unknown").to_string();
     let score = data.get("score").and_then(|s| s.as_u64()).unwrap_or(0) as u32;
-    let rank =
-      data.get("place").and_then(|p| p.as_u64().map(|v| v as u32).or_else(|| p.as_str().and_then(|s| s.parse().ok())));
+    let rank = data.get("place").and_then(|p| {
+      p.as_u64().map(|v| v as u32).or_else(|| p.as_str().and_then(|s| s.parse().ok()))
+    });
 
     Ok(TeamInfo { name, score, rank, solves: Vec::new() })
   }
@@ -301,8 +313,9 @@ impl Platform for CtfdPlatform {
   }
 
   async fn submit(&self, challenge_id: &str, flag: &str) -> Result<SubmitResult> {
-    let challenge_id_num: u64 =
-      challenge_id.parse().map_err(|_| Error::Platform(format!("Invalid challenge ID: {challenge_id}")))?;
+    let challenge_id_num: u64 = challenge_id
+      .parse()
+      .map_err(|_| Error::Platform(format!("Invalid challenge ID: {challenge_id}")))?;
 
     let payload = serde_json::json!({
       "challenge_id": challenge_id_num,
@@ -318,7 +331,8 @@ impl Platform for CtfdPlatform {
     match status {
       "correct" => {
         let challenge = self.challenge(challenge_id).await.ok();
-        let name = challenge.as_ref().map(|c| c.name.clone()).unwrap_or_else(|| challenge_id.to_string());
+        let name =
+          challenge.as_ref().map(|c| c.name.clone()).unwrap_or_else(|| challenge_id.to_string());
         let points = challenge.as_ref().map(|c| c.value).unwrap_or(0);
         Ok(SubmitResult::Correct { challenge: name, points })
       }
@@ -327,9 +341,9 @@ impl Platform for CtfdPlatform {
       "ratelimited" => {
         // Try to parse retry_after from the response message
         let message = data.get("message").and_then(|m| m.as_str()).unwrap_or("");
-        let retry_after = message
-          .split_whitespace()
-          .find_map(|word| word.trim_end_matches(|c: char| !c.is_ascii_digit()).parse::<u64>().ok());
+        let retry_after = message.split_whitespace().find_map(|word| {
+          word.trim_end_matches(|c: char| !c.is_ascii_digit()).parse::<u64>().ok()
+        });
         Ok(SubmitResult::RateLimited { retry_after })
       }
       _ => Err(Error::Platform(format!("Unknown submit status: {status}"))),
@@ -352,7 +366,10 @@ impl Platform for CtfdPlatform {
         let score = team_data
           .get("solves")
           .and_then(|s| s.as_array())
-          .map(|solves| solves.iter().filter_map(|s| s.get("value").and_then(|v| v.as_u64())).sum::<u64>() as u32)
+          .map(|solves| {
+            solves.iter().filter_map(|s| s.get("value").and_then(|v| v.as_u64())).sum::<u64>()
+              as u32
+          })
           .unwrap_or(0);
 
         entries.push(ScoreboardEntry { rank, name, score });
@@ -364,12 +381,20 @@ impl Platform for CtfdPlatform {
   }
 
   async fn download_file(&self, file: &ChallengeFile, dest: &Path) -> Result<()> {
-    let url = if file.url.starts_with("http") { file.url.clone() } else { format!("{}{}", self.base_url, file.url) };
+    let url = if file.url.starts_with("http") {
+      file.url.clone()
+    } else {
+      format!("{}{}", self.base_url, file.url)
+    };
 
     let req = self.client.get(&url);
     let resp = self.apply_auth(req).send().await?;
     if !resp.status().is_success() {
-      return Err(Error::Platform(format!("Failed to download file '{}' (HTTP {})", file.name, resp.status())));
+      return Err(Error::Platform(format!(
+        "Failed to download file '{}' (HTTP {})",
+        file.name,
+        resp.status()
+      )));
     }
 
     let bytes = resp.bytes().await?;
@@ -510,7 +535,7 @@ mod tests {
 
   #[test]
   fn auth_method_pure_hex_is_token() {
-    // Pure hex string without dots — definitely an API token
+    // Pure hex string without dots, definitely an API token
     let plat = CtfdPlatform::new("https://ctf.example.com".into(), "a1b2c3d4e5f6".into());
     assert!(matches!(plat.auth, AuthMethod::Token(_)));
   }
@@ -518,8 +543,10 @@ mod tests {
   #[test]
   fn auth_method_flask_session_with_three_parts() {
     // Typical Flask session: base64.timestamp.signature
-    let plat =
-      CtfdPlatform::new("https://ctf.example.com".into(), "eyJpZCI6MX0.ZxYzAw.aBcDeFgHiJkLmNoPqRsTuVwXyZ".into());
+    let plat = CtfdPlatform::new(
+      "https://ctf.example.com".into(),
+      "eyJpZCI6MX0.ZxYzAw.aBcDeFgHiJkLmNoPqRsTuVwXyZ".into(),
+    );
     assert!(matches!(plat.auth, AuthMethod::Session));
   }
 }

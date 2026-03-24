@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CTF GDB MCP Server — dynamic analysis, breakpoint inspection, input tracing."""
+"""CTF GDB MCP Server: dynamic analysis, breakpoint inspection, input tracing."""
 
 import json
 import os
@@ -8,9 +8,9 @@ import shlex
 import sys
 import tempfile
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "lib"))
+sys.path.insert(0, os.path.dirname(__file__))
 from fastmcp import FastMCP
-from subprocess_utils import run_tool
+from lib.subprocess_utils import run_tool
 
 mcp = FastMCP(
     "ctf-gdb",
@@ -405,7 +405,7 @@ def gdb_trace_input(
 
 @mcp.tool()
 def gdb_checksec_runtime(path: str, symbols: list[str] | None = None) -> str:
-    """Get runtime security info — ASLR state, libc base, GOT entries, and resolved symbol addresses."""
+    """Get runtime security info: ASLR state, libc base, GOT entries, and resolved symbol addresses."""
     path = os.path.realpath(path)
     if not os.path.isfile(path):
         return json.dumps({"error": f"File not found: {path}"})

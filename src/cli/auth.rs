@@ -21,8 +21,8 @@ fn keyring_key(workspace_name: &str) -> String {
 }
 
 pub fn store_token(workspace_name: &str, token: &str) -> Result<()> {
-  let entry =
-    keyring::Entry::new("ctf-buster", &keyring_key(workspace_name)).map_err(|e| Error::Keyring(e.to_string()))?;
+  let entry = keyring::Entry::new("ctf-buster", &keyring_key(workspace_name))
+    .map_err(|e| Error::Keyring(e.to_string()))?;
   entry.set_password(token).map_err(|e| Error::Keyring(e.to_string()))?;
   Ok(())
 }
@@ -68,8 +68,8 @@ pub fn get_token_with_config(
   }
 
   // 4. Keyring
-  let entry =
-    keyring::Entry::new("ctf-buster", &keyring_key(workspace_name)).map_err(|e| Error::Keyring(e.to_string()))?;
+  let entry = keyring::Entry::new("ctf-buster", &keyring_key(workspace_name))
+    .map_err(|e| Error::Keyring(e.to_string()))?;
   entry.get_password().map_err(|e| {
     Error::Auth(format!(
       "No token found. Set CTF_TOKEN env var, add `token` to .ctf.toml, or run `ctf auth login`. ({e})"
@@ -82,14 +82,15 @@ pub fn get_token(workspace_name: &str) -> Result<String> {
 }
 
 pub fn delete_token(workspace_name: &str) -> Result<()> {
-  let entry =
-    keyring::Entry::new("ctf-buster", &keyring_key(workspace_name)).map_err(|e| Error::Keyring(e.to_string()))?;
+  let entry = keyring::Entry::new("ctf-buster", &keyring_key(workspace_name))
+    .map_err(|e| Error::Keyring(e.to_string()))?;
   entry.delete_credential().map_err(|e| Error::Keyring(e.to_string()))?;
   Ok(())
 }
 
 pub async fn handle_login(workspace_name: &str, platform_url: &str) -> Result<()> {
-  let token: String = Password::new().with_prompt("API token").interact().map_err(|e| Error::Auth(e.to_string()))?;
+  let token: String =
+    Password::new().with_prompt("API token").interact().map_err(|e| Error::Auth(e.to_string()))?;
 
   // Verify the token works
   let config = PlatformConfig { platform_type: None, url: platform_url.to_string(), token: None };
@@ -108,12 +109,18 @@ pub async fn handle_login(workspace_name: &str, platform_url: &str) -> Result<()
 }
 
 pub async fn handle_login_interactive() -> Result<()> {
-  let url: String = Input::new().with_prompt("Platform URL").interact_text().map_err(|e| Error::Auth(e.to_string()))?;
+  let url: String = Input::new()
+    .with_prompt("Platform URL")
+    .interact_text()
+    .map_err(|e| Error::Auth(e.to_string()))?;
 
-  let workspace_name: String =
-    Input::new().with_prompt("Workspace name").interact_text().map_err(|e| Error::Auth(e.to_string()))?;
+  let workspace_name: String = Input::new()
+    .with_prompt("Workspace name")
+    .interact_text()
+    .map_err(|e| Error::Auth(e.to_string()))?;
 
-  let token: String = Password::new().with_prompt("API token").interact().map_err(|e| Error::Auth(e.to_string()))?;
+  let token: String =
+    Password::new().with_prompt("API token").interact().map_err(|e| Error::Auth(e.to_string()))?;
 
   let config = PlatformConfig { platform_type: None, url: url.clone(), token: None };
 

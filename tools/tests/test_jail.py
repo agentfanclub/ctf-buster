@@ -1,4 +1,4 @@
-"""Tests for ctf_jail.py — jail escape MCP tools."""
+"""Tests for ctf_jail.py, jail escape MCP tools."""
 
 import json
 import os

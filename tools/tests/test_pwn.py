@@ -1,4 +1,4 @@
-"""Tests for ctf_pwn.py — pure-Python logic and mocked tool calls."""
+"""Tests for ctf_pwn.py, pure-Python logic and mocked tool calls."""
 
 import json
 import os
@@ -27,7 +27,7 @@ pwntools_template = _unwrap(ctf_pwn.pwn_pwntools_template)
 angr_analyze = _unwrap(ctf_pwn.pwn_angr_analyze)
 
 
-# ── DANGEROUS_FUNCS constant ─────────────────────────────────────────────────
+# -- DANGEROUS_FUNCS constant ------------------------------------------------─
 
 
 class TestDangerousFuncs:
@@ -47,7 +47,7 @@ class TestDangerousFuncs:
         assert isinstance(ctf_pwn.DANGEROUS_FUNCS, set)
 
 
-# ── pwn_triage tests ──────────────────────────────────────────────────────
+# -- pwn_triage tests ------------------------------------------------------
 
 
 class TestBinaryTriage:
@@ -107,7 +107,7 @@ class TestBinaryTriage:
                 os.unlink(link_path)
 
 
-# ── pattern_offset tests ─────────────────────────────────────────────────────
+# -- pattern_offset tests ----------------------------------------------------─
 
 
 class TestPatternOffset:
@@ -159,7 +159,7 @@ class TestPatternOffset:
         assert find_result["offset"] == 40
 
 
-# ── shellcode_generate tests ─────────────────────────────────────────────────
+# -- shellcode_generate tests ------------------------------------------------─
 
 
 class TestShellcodeGenerate:
@@ -203,7 +203,7 @@ class TestShellcodeGenerate:
         assert "error" in result
 
 
-# ── pwntools_template tests ──────────────────────────────────────────────────
+# -- pwntools_template tests --------------------------------------------------
 
 
 class TestPwntoolsTemplate:
@@ -287,7 +287,7 @@ class TestPwntoolsTemplate:
             os.unlink(path)
 
 
-# ── angr_analyze tests ───────────────────────────────────────────────────────
+# -- angr_analyze tests ------------------------------------------------------─
 
 
 class TestAngrAnalyze:
@@ -328,7 +328,7 @@ class TestAngrAnalyze:
             pytest.skip("angr not available")
 
 
-# ── Integration: tool output is always valid JSON ────────────────────────────
+# -- Integration: tool output is always valid JSON ----------------------------
 
 
 class TestJsonOutput:
@@ -351,7 +351,7 @@ class TestJsonOutput:
         json.loads(raw)
 
 
-# ── pwn_libc_lookup tests ───────────────────────────────────────────────────
+# -- pwn_libc_lookup tests --------------------------------------------------─
 
 libc_lookup = _unwrap(ctf_pwn.pwn_libc_lookup)
 
@@ -440,7 +440,7 @@ class TestLibcLookup:
             json.loads(libc_lookup('{"puts": "0x7f1234567890"}'))
 
 
-# ── pwn_format_string tests ─────────────────────────────────────────────────
+# -- pwn_format_string tests ------------------------------------------------─
 
 format_string = _unwrap(ctf_pwn.pwn_format_string)
 
@@ -488,7 +488,7 @@ class TestFormatString:
         )
 
 
-# ── TestTriageMocked — mock rabin2 successful output parsing ────────────────
+# -- TestTriageMocked, mock rabin2 successful output parsing ----------------
 
 
 class TestTriageMocked:
@@ -584,7 +584,7 @@ class TestTriageMocked:
             os.unlink(path)
 
 
-# ── TestAngrMocked — mock angr for all modes ────────────────────────────────
+# -- TestAngrMocked, mock angr for all modes --------------------------------
 
 
 class TestAngrMocked:
@@ -703,7 +703,7 @@ class TestAngrMocked:
             os.unlink(path)
 
 
-# ── TestShellcodeEdgeCases ──────────────────────────────────────────────────
+# -- TestShellcodeEdgeCases --------------------------------------------------
 
 
 class TestShellcodeEdgeCases:
@@ -719,7 +719,7 @@ class TestShellcodeEdgeCases:
         assert "length" in result or "error" in result
 
 
-# ── TestPatternOffsetEdgeCases ──────────────────────────────────────────────
+# -- TestPatternOffsetEdgeCases ----------------------------------------------
 
 
 class TestPatternOffsetEdgeCases:
