@@ -16,7 +16,12 @@ pub struct RctfPlatform {
 
 impl RctfPlatform {
   pub fn new(url: String, token: String) -> Self {
-    Self { base_url: url.trim_end_matches('/').to_string(), token, client: Client::new() }
+    let client = Client::builder()
+      .timeout(std::time::Duration::from_secs(30))
+      .connect_timeout(std::time::Duration::from_secs(10))
+      .build()
+      .unwrap_or_default();
+    Self { base_url: url.trim_end_matches('/').to_string(), token, client }
   }
 
   fn api_url(&self, path: &str) -> String {
@@ -222,6 +227,8 @@ impl Platform for RctfPlatform {
   }
 
   async fn download_file(&self, file: &ChallengeFile, dest: &Path) -> Result<()> {
+    const MAX_DOWNLOAD_SIZE: u64 = 500 * 1024 * 1024; // 500 MB
+
     let url = if file.url.starts_with("http") {
       file.url.clone()
     } else {
@@ -235,7 +242,34 @@ impl Platform for RctfPlatform {
       .send()
       .await?;
 
+    if !resp.status().is_success() {
+      return Err(Error::Platform(format!(
+        "Failed to download file '{}' (HTTP {})",
+        file.name,
+        resp.status()
+      )));
+    }
+
+    // Check Content-Length if available to reject oversized files early
+    if let Some(len) = resp.content_length() {
+      if len > MAX_DOWNLOAD_SIZE {
+        return Err(Error::Platform(format!(
+          "File '{}' too large ({} bytes, max {})",
+          file.name, len, MAX_DOWNLOAD_SIZE
+        )));
+      }
+    }
+
     let bytes = resp.bytes().await?;
+    if bytes.len() as u64 > MAX_DOWNLOAD_SIZE {
+      return Err(Error::Platform(format!(
+        "File '{}' too large ({} bytes, max {})",
+        file.name,
+        bytes.len(),
+        MAX_DOWNLOAD_SIZE
+      )));
+    }
+
     tokio::fs::write(dest, &bytes).await?;
     Ok(())
   }

@@ -465,21 +465,47 @@ def crypto_math_solve(mode: str, expression: str, variables: str = "") -> str:
     if mode == "eval":
         import sympy
 
-        # Create a safe namespace with sympy functions
-        ns = {
-            name: getattr(sympy, name)
-            for name in dir(sympy)
-            if not name.startswith("_")
+        # Create a safe namespace with only math-related sympy functions
+        _ALLOWED_SYMPY = {
+            "Integer", "Rational", "Float", "pi", "E", "I", "oo", "zoo", "nan",
+            "sqrt", "cbrt", "root", "Abs", "sign", "ceiling", "floor",
+            "factorial", "binomial", "gcd", "lcm", "mod_inverse",
+            "isprime", "nextprime", "prevprime", "prime", "primerange",
+            "factorint", "divisors", "totient",
+            "log", "ln", "exp", "sin", "cos", "tan",
+            "Mod", "Pow", "Add", "Mul",
+            "solve", "simplify", "expand", "factor",
+            "Symbol", "symbols", "Eq", "Ne", "Lt", "Gt", "Le", "Ge",
+            "Matrix", "eye", "zeros", "ones",
+            "integer_nthroot", "igcd", "ilcm", "isqrt", "iroot",
+            "Poly", "gcdex", "invert", "discrete_log", "nthroot_mod",
+            "crt", "primitive_root",
         }
+        ns = {}
+        for name in _ALLOWED_SYMPY:
+            if hasattr(sympy, name):
+                ns[name] = getattr(sympy, name)
         ns["pow"] = pow
         ns["int"] = int
         ns["hex"] = hex
         ns["bin"] = bin
         ns["bytes"] = bytes
+
+        # Block dangerous patterns in expression
         if "__" in expression:
             return json.dumps(
                 {"error": "Expression contains forbidden dunder access"}, indent=2
             )
+        _BLOCKED_PATTERNS = ["import", "exec", "eval", "compile", "open",
+                             "getattr", "setattr", "delattr", "globals", "locals",
+                             "vars", "dir", "type(", "breakpoint", "exit", "quit",
+                             "subprocess", "os.", "sys.", "shutil"]
+        expr_lower = expression.lower()
+        for pat in _BLOCKED_PATTERNS:
+            if pat in expr_lower:
+                return json.dumps(
+                    {"error": f"Expression contains forbidden pattern: {pat}"}, indent=2
+                )
         try:
             result = eval(expression, {"__builtins__": {}}, ns)
             return json.dumps({"result": str(result)}, indent=2)
@@ -490,12 +516,24 @@ def crypto_math_solve(mode: str, expression: str, variables: str = "") -> str:
         import z3
 
         var_names = [v.strip() for v in variables.split(",") if v.strip()]
+        # Validate variable names are safe identifiers
+        for vn in var_names:
+            if not vn.isidentifier() or vn.startswith("_"):
+                return json.dumps(
+                    {"error": f"Invalid variable name: '{vn}'. Must be a safe identifier."},
+                    indent=2,
+                )
         z3_vars = {}
         for name in var_names:
             z3_vars[name] = z3.Int(name)
 
         solver = z3.Solver()
         constraints = [c.strip() for c in expression.split(";") if c.strip()]
+
+        _BLOCKED_PATTERNS = ["import", "exec", "eval", "compile", "open",
+                             "getattr", "setattr", "delattr", "globals", "locals",
+                             "vars", "dir", "type(", "breakpoint", "subprocess",
+                             "os.", "sys.", "shutil"]
 
         for constraint in constraints:
             if "__" in constraint:
@@ -505,6 +543,13 @@ def crypto_math_solve(mode: str, expression: str, variables: str = "") -> str:
                     },
                     indent=2,
                 )
+            constraint_lower = constraint.lower()
+            for pat in _BLOCKED_PATTERNS:
+                if pat in constraint_lower:
+                    return json.dumps(
+                        {"error": f"Constraint contains forbidden pattern '{pat}': '{constraint}'"},
+                        indent=2,
+                    )
             try:
                 parsed = eval(constraint, {"__builtins__": {}}, z3_vars)
                 solver.add(parsed)

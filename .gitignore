@@ -33,6 +33,7 @@ cookies.txt
 test-workspace/
 pwnyctf/
 dicectf/
+.ctf-state.json
 
 # Claude Code
 .claude/

@@ -45,10 +45,20 @@ impl CtfdPlatform {
       let url_parsed: url::Url =
         base_url.parse().unwrap_or_else(|_| "http://localhost".parse().unwrap());
       jar.add_cookie_str(&format!("session={token}"), &url_parsed);
-      let client = Client::builder().cookie_provider(jar).build().unwrap_or_default();
+      let client = Client::builder()
+        .cookie_provider(jar)
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap_or_default();
       (AuthMethod::Session, client)
     } else {
-      (AuthMethod::Token(token), Client::new())
+      let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap_or_default();
+      (AuthMethod::Token(token), client)
     };
 
     Self { base_url, auth, client, csrf_nonce: Mutex::new(None) }
@@ -381,6 +391,8 @@ impl Platform for CtfdPlatform {
   }
 
   async fn download_file(&self, file: &ChallengeFile, dest: &Path) -> Result<()> {
+    const MAX_DOWNLOAD_SIZE: u64 = 500 * 1024 * 1024; // 500 MB
+
     let url = if file.url.starts_with("http") {
       file.url.clone()
     } else {
@@ -397,7 +409,26 @@ impl Platform for CtfdPlatform {
       )));
     }
 
+    // Check Content-Length if available to reject oversized files early
+    if let Some(len) = resp.content_length() {
+      if len > MAX_DOWNLOAD_SIZE {
+        return Err(Error::Platform(format!(
+          "File '{}' too large ({} bytes, max {})",
+          file.name, len, MAX_DOWNLOAD_SIZE
+        )));
+      }
+    }
+
     let bytes = resp.bytes().await?;
+    if bytes.len() as u64 > MAX_DOWNLOAD_SIZE {
+      return Err(Error::Platform(format!(
+        "File '{}' too large ({} bytes, max {})",
+        file.name,
+        bytes.len(),
+        MAX_DOWNLOAD_SIZE
+      )));
+    }
+
     tokio::fs::write(dest, &bytes).await?;
     Ok(())
   }

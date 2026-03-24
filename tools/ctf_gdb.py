@@ -23,6 +23,22 @@ mcp = FastMCP(
 )
 
 
+def _validate_breakpoint(bp: str) -> str:
+    """Validate a breakpoint specification to prevent GDB command injection.
+
+    Allows: function names, addresses (0x...), file:line, *address.
+    Rejects: newlines, semicolons, and other GDB metacharacters.
+    """
+    bp = bp.strip()
+    if not bp:
+        raise ValueError("Empty breakpoint specification")
+    # Block GDB command separators and shell metacharacters
+    forbidden = set("\n\r;|&`$")
+    if any(c in forbidden for c in bp):
+        raise ValueError(f"Breakpoint contains forbidden characters: {bp!r}")
+    return bp
+
+
 def _build_gdb_script(preamble_commands, main_commands):
     """Build a GDB batch script with standard preamble."""
     lines = [
@@ -130,7 +146,13 @@ def gdb_run(
         stdin = stdin_data.encode()
 
     preamble = []
-    main_cmds = list(commands)
+    # Sanitize commands: block newlines to prevent GDB script injection
+    sanitized_cmds = []
+    for cmd in commands:
+        if "\n" in cmd or "\r" in cmd:
+            return json.dumps({"error": f"Command contains newlines: {cmd!r}"})
+        sanitized_cmds.append(cmd)
+    main_cmds = sanitized_cmds
     stdin_path = None
 
     has_run = any(
@@ -205,6 +227,10 @@ def gdb_break_inspect(
     main_cmds = []
     stdin_path = None
     for bp in breakpoints:
+        try:
+            bp = _validate_breakpoint(bp)
+        except ValueError as e:
+            return json.dumps({"error": str(e)})
         main_cmds.append(f"break {bp}")
 
     if stdin is not None:
@@ -223,6 +249,8 @@ def gdb_break_inspect(
         if memory_reads:
             main_cmds.append("echo ===MEMORY===\\n")
             for mem_cmd in memory_reads:
+                if "\n" in mem_cmd or "\r" in mem_cmd or ";" in mem_cmd:
+                    return json.dumps({"error": f"Memory read contains forbidden characters: {mem_cmd!r}"})
                 main_cmds.append(
                     mem_cmd if mem_cmd.startswith("x/") else f"x/ {mem_cmd}"
                 )
@@ -323,6 +351,10 @@ def gdb_trace_input(
 
     main_cmds = []
     if breakpoint:
+        try:
+            breakpoint = _validate_breakpoint(breakpoint)
+        except ValueError as e:
+            return json.dumps({"error": str(e)})
         main_cmds.append(f"break {breakpoint}")
     main_cmds.extend(
         [
@@ -424,6 +456,10 @@ def gdb_checksec_runtime(path: str, symbols: list[str] | None = None) -> str:
     if symbols:
         main_cmds.append("echo ===SYMBOLS===\\n")
         for sym in symbols:
+            try:
+                sym = _validate_breakpoint(sym)
+            except ValueError as e:
+                return json.dumps({"error": f"Invalid symbol name: {e}"})
             main_cmds.append(f"info address {sym}")
 
     script = _build_gdb_script([], main_cmds)
