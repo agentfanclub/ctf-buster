@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """CTF Jail Escape MCP Server: pyjail and bash jail analysis, bypass payload generation."""
 
-import ast
 import json
 import os
 import re

@@ -27,7 +27,7 @@ pwntools_template = _unwrap(ctf_pwn.pwn_pwntools_template)
 angr_analyze = _unwrap(ctf_pwn.pwn_angr_analyze)
 
 
-# -- DANGEROUS_FUNCS constant ------------------------------------------------─
+# -- DANGEROUS_FUNCS constant -------------------------------------------------
 
 
 class TestDangerousFuncs:
@@ -107,7 +107,7 @@ class TestBinaryTriage:
                 os.unlink(link_path)
 
 
-# -- pattern_offset tests ----------------------------------------------------─
+# -- pattern_offset tests -----------------------------------------------------
 
 
 class TestPatternOffset:
@@ -159,7 +159,7 @@ class TestPatternOffset:
         assert find_result["offset"] == 40
 
 
-# -- shellcode_generate tests ------------------------------------------------─
+# -- shellcode_generate tests -------------------------------------------------
 
 
 class TestShellcodeGenerate:
@@ -287,7 +287,7 @@ class TestPwntoolsTemplate:
             os.unlink(path)
 
 
-# -- angr_analyze tests ------------------------------------------------------─
+# -- angr_analyze tests -------------------------------------------------------
 
 
 class TestAngrAnalyze:
@@ -351,7 +351,7 @@ class TestJsonOutput:
         json.loads(raw)
 
 
-# -- pwn_libc_lookup tests --------------------------------------------------─
+# -- pwn_libc_lookup tests ---------------------------------------------------
 
 libc_lookup = _unwrap(ctf_pwn.pwn_libc_lookup)
 
@@ -440,7 +440,7 @@ class TestLibcLookup:
             json.loads(libc_lookup('{"puts": "0x7f1234567890"}'))
 
 
-# -- pwn_format_string tests ------------------------------------------------─
+# -- pwn_format_string tests -------------------------------------------------
 
 format_string = _unwrap(ctf_pwn.pwn_format_string)
 

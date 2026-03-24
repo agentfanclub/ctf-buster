@@ -30,7 +30,7 @@ pub struct App {
   pub active_panel: ActivePanel,
   pub should_quit: bool,
   pub challenge_scroll: usize,
-  pub notif_scroll: usize,
+  pub notification_scroll: usize,
 }
 
 impl App {
@@ -43,7 +43,7 @@ impl App {
       active_panel: ActivePanel::Challenges,
       should_quit: false,
       challenge_scroll: 0,
-      notif_scroll: 0,
+      notification_scroll: 0,
     })
   }
 
@@ -72,8 +72,8 @@ impl App {
         }
       }
       ActivePanel::Notifications => {
-        if self.notif_scroll < self.state.notifications.len().saturating_sub(1) {
-          self.notif_scroll += 1;
+        if self.notification_scroll < self.state.notifications.len().saturating_sub(1) {
+          self.notification_scroll += 1;
         }
       }
       ActivePanel::Queue => {}
@@ -86,7 +86,7 @@ impl App {
         self.challenge_scroll = self.challenge_scroll.saturating_sub(1);
       }
       ActivePanel::Notifications => {
-        self.notif_scroll = self.notif_scroll.saturating_sub(1);
+        self.notification_scroll = self.notification_scroll.saturating_sub(1);
       }
       ActivePanel::Queue => {}
     }
@@ -123,16 +123,16 @@ impl App {
   }
 
   pub fn categories(&self) -> Vec<(String, usize, usize)> {
-    let mut cats: std::collections::BTreeMap<String, (usize, usize)> =
+    let mut by_category: std::collections::BTreeMap<String, (usize, usize)> =
       std::collections::BTreeMap::new();
-    for c in self.state.challenges.values() {
-      let entry = cats.entry(c.category.clone()).or_insert((0, 0));
-      entry.1 += 1;
-      if c.status == ChallengeStatus::Solved {
-        entry.0 += 1;
+    for challenge in self.state.challenges.values() {
+      let (solved, total) = by_category.entry(challenge.category.clone()).or_insert((0, 0));
+      *total += 1;
+      if challenge.status == ChallengeStatus::Solved {
+        *solved += 1;
       }
     }
-    cats.into_iter().map(|(cat, (solved, total))| (cat, solved, total)).collect()
+    by_category.into_iter().map(|(name, (solved, total))| (name, solved, total)).collect()
   }
 }
 
@@ -213,7 +213,7 @@ mod tests {
       active_panel: ActivePanel::Challenges,
       should_quit: false,
       challenge_scroll: 0,
-      notif_scroll: 0,
+      notification_scroll: 0,
     }
   }
 
@@ -317,11 +317,11 @@ mod tests {
       make_challenge("B", "crypto", ChallengeStatus::Unsolved, Some(200)),
       make_challenge("C", "web", ChallengeStatus::Solved, Some(150)),
     ]);
-    let cats = app.categories();
+    let category_stats = app.categories();
     // BTreeMap so categories are sorted alphabetically
-    assert_eq!(cats.len(), 2);
-    assert_eq!(cats[0], ("crypto".into(), 1, 2)); // 1 solved, 2 total
-    assert_eq!(cats[1], ("web".into(), 1, 1)); // 1 solved, 1 total
+    assert_eq!(category_stats.len(), 2);
+    assert_eq!(category_stats[0], ("crypto".into(), 1, 2)); // 1 solved, 2 total
+    assert_eq!(category_stats[1], ("web".into(), 1, 1)); // 1 solved, 1 total
   }
 
   // -- handle_key tests -------------------------------------------------------

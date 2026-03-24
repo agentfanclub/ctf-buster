@@ -171,23 +171,26 @@ pub async fn handle_status(workspace_root: &Path) -> Result<()> {
   }
   println!();
 
-  // Group by category
-  let mut categories: std::collections::BTreeMap<String, (u32, u32, u32)> =
+  // Group by category: (solved_count, total_count)
+  let mut categories: std::collections::BTreeMap<String, (u32, u32)> =
     std::collections::BTreeMap::new();
   for c in &challenges {
     let entry = categories.entry(c.category.clone()).or_default();
-    entry.1 += 1; // total
-    entry.2 += c.value; // total points
+    entry.1 += 1;
     if c.solved_by_me {
-      entry.0 += 1; // solved
+      entry.0 += 1;
     }
   }
 
-  println!("  {:<15} {:<10} {:<10}", "Category".bold(), "Solved".bold(), "Points".bold());
+  println!("  {:<15} {:<10} {:<10}", "Category".bold(), "Solved".bold(), "Progress".bold());
   println!("  {}", "-".repeat(35));
-  for (cat, (solved_c, total_c, _points)) in &categories {
-    let pct = if *total_c > 0 { (*solved_c as f32 / *total_c as f32 * 100.0) as u32 } else { 0 };
-    println!("  {cat:<15} {solved_c}/{total_c:<7} {pct}%");
+  for (cat, (solved_count, total_count)) in &categories {
+    let pct = if *total_count > 0 {
+      (*solved_count as f32 / *total_count as f32 * 100.0) as u32
+    } else {
+      0
+    };
+    println!("  {cat:<15} {solved_count}/{total_count:<7} {pct}%");
   }
   println!();
   println!("  Total: {solved}/{total} challenges solved ({solved_points}/{total_points} pts)");

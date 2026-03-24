@@ -68,7 +68,7 @@ class TestParseR2Json:
         assert len(result[0]["funcs"]) == 2
 
 
-# -- _r2_cmd tests ----------------------------------------------------------─
+# -- _r2_cmd tests -----------------------------------------------------------
 
 
 class TestR2Cmd:
@@ -80,7 +80,7 @@ class TestR2Cmd:
         assert "returncode" in result
 
 
-# -- rev_functions tool tests ------------------------------------------------─
+# -- rev_functions tool tests -------------------------------------------------
 
 
 class TestR2Functions:

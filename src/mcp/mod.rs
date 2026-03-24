@@ -363,14 +363,15 @@ impl McpServer {
     let total_points: u32 = challenges.iter().map(|c| c.value).sum();
     let solved_points: u32 = challenges.iter().filter(|c| c.solved_by_me).map(|c| c.value).sum();
 
+    // Per-category stats: (solved_count, total_count, total_points)
     let mut categories: std::collections::BTreeMap<&str, (u32, u32, u32)> =
       std::collections::BTreeMap::new();
     for c in &challenges {
-      let entry = categories.entry(&c.category).or_default();
-      entry.1 += 1;
-      entry.2 += c.value;
+      let (solved_count, total_count, total_points) = categories.entry(&c.category).or_default();
+      *total_count += 1;
+      *total_points += c.value;
       if c.solved_by_me {
-        entry.0 += 1;
+        *solved_count += 1;
       }
     }
 
@@ -619,10 +620,9 @@ impl McpServer {
     Parameters(params): Parameters<AutoQueueParams>,
   ) -> Result<CallToolResult, McpError> {
     // Get current challenges from platform
-    let challenges = self.platform.challenges().await.map_err(to_mcp_error)?;
+    let mut challenges = self.platform.challenges().await.map_err(to_mcp_error)?;
 
     // Merge cached details for solve count info
-    let mut challenges = challenges;
     if let Ok(ws_state) = state::load_state(&self.workspace_root) {
       state::merge_cached_details(&mut challenges, &ws_state);
     }
@@ -875,17 +875,25 @@ Use forensics_file_triage on any downloaded files to determine content type, the
       let hints_str =
         if hints.is_empty() { String::new() } else { format!("\n   Hints: {}", hints.join("; ")) };
 
-      // Compute the challenge directory path
-      let cat_dir = scaffold::sanitize_filename(&target.category.to_lowercase());
-      let name_dir = scaffold::sanitize_filename(
-        &target
-          .name
-          .to_lowercase()
-          .chars()
-          .map(|c| if c == ' ' { '-' } else { c })
-          .collect::<String>(),
+      // Compute the challenge directory path using the same logic as scaffolding
+      let pseudo_challenge = crate::platform::types::Challenge {
+        id: String::new(),
+        name: target.name.clone(),
+        category: target.category.clone(),
+        description: String::new(),
+        value: target.points,
+        solves: 0,
+        solved_by_me: false,
+        files: vec![],
+        tags: vec![],
+        hints: vec![],
+      };
+      let challenge_dir = scaffold::challenge_dir(
+        &self.workspace_root,
+        &pseudo_challenge,
+        &self.workspace_config.scaffold,
       );
-      let challenge_dir = format!("{}/{}/{}", self.workspace_root.display(), cat_dir, name_dir);
+      let challenge_dir = challenge_dir.display().to_string();
 
       let retry_section = if is_retry {
         format!(

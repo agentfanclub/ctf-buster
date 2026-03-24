@@ -36,10 +36,14 @@
     }
   },
   "features": {},
+  "containerEnv": {
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}"
+  },
   "postCreateCommand": "cargo build --release 2>&1 | tail -1",
   "forwardPorts": [],
   "mounts": [
     "source=ctf-buster-cargo-cache,target=/home/ctf/.cargo/registry,type=volume",
-    "source=ctf-buster-target-cache,target=/workspace/target,type=volume"
+    "source=ctf-buster-target-cache,target=/workspace/target,type=volume",
+    "source=ctf-buster-claude-config,target=/home/ctf/.claude,type=volume"
   ]
 }

@@ -310,7 +310,7 @@ def gdb_trace_input(
     path: str,
     input_data: str = "",
     input_hex: str = "",
-    breakpoint: str = "",
+    break_at: str = "",
     pattern_length: int = 200,
 ) -> str:
     """Trace input in memory to find buffer overflow offsets. Auto-generates cyclic pattern if no input given."""
@@ -350,12 +350,12 @@ def gdb_trace_input(
     stdin_path = _write_temp(stdin, suffix=".stdin", mode="wb")
 
     main_cmds = []
-    if breakpoint:
+    if break_at:
         try:
-            breakpoint = _validate_breakpoint(breakpoint)
+            break_at = _validate_breakpoint(break_at)
         except ValueError as e:
             return json.dumps({"error": str(e)})
-        main_cmds.append(f"break {breakpoint}")
+        main_cmds.append(f"break {break_at}")
     main_cmds.extend(
         [
             f"run < {stdin_path}",
@@ -387,9 +387,9 @@ def gdb_trace_input(
             parsed["crash_address"] = sig_match.group(1)
     elif "SIGABRT" in output:
         parsed["signal"] = "SIGABRT"
-    elif breakpoint:
+    elif break_at:
         parsed["signal"] = None
-        parsed["stopped_at"] = breakpoint
+        parsed["stopped_at"] = break_at
 
     if use_pattern and "crash_address" in parsed:
         try:

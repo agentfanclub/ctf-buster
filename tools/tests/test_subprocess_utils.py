@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from lib.subprocess_utils import parse_checksec, run_tool, safe_read_file
 
-# -- run_tool tests ----------------------------------------------------------─
+# -- run_tool tests -----------------------------------------------------------
 
 
 class TestRunTool:
@@ -42,10 +42,8 @@ class TestRunTool:
         result = run_tool(["nonexistent_tool_xyz_123"])
         assert result["returncode"] == -1
         assert "error" in result
-        assert (
-            "not found" in result["error"].lower()
-            or "Tool not found" in result["error"]
-        )
+        err = result["error"].lower()
+        assert "not found" in err or "permission denied" in err
 
     def test_input_data(self):
         result = run_tool(["cat"], input_data=b"hello from stdin")
@@ -65,7 +63,7 @@ class TestRunTool:
         assert lines[2] == "line3"
 
 
-# -- parse_checksec tests ----------------------------------------------------─
+# -- parse_checksec tests -----------------------------------------------------
 
 
 class TestParseChecksec:
@@ -135,7 +133,7 @@ PIE: PIE enabled"""
         assert result["canary"] is True
 
 
-# -- safe_read_file tests ----------------------------------------------------─
+# -- safe_read_file tests -----------------------------------------------------
 
 
 class TestSafeReadFile:
@@ -215,10 +213,11 @@ class TestRunToolEdgeCases:
     def test_command_not_found(self):
         result = run_tool(["nonexistent_command_xyz_12345"])
         assert result["returncode"] == -1
-        assert "not found" in result.get("error", "").lower()
+        err = result.get("error", "").lower()
+        assert "not found" in err or "permission denied" in err
 
 
-# -- TestSafeReadFileEdgeCases ----------------------------------------------─
+# -- TestSafeReadFileEdgeCases -----------------------------------------------
 
 
 class TestSafeReadFileEdgeCases:

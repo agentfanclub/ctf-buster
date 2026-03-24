@@ -31,7 +31,7 @@ extract_embedded = _unwrap(ctf_forensics.forensics_extract_embedded)
 entropy_analysis = _unwrap(ctf_forensics.forensics_entropy_analysis)
 image_analysis = _unwrap(ctf_forensics.forensics_image_analysis)
 
-# -- _calculate_entropy tests ------------------------------------------------─
+# -- _calculate_entropy tests -------------------------------------------------
 
 
 class TestCalculateEntropy:
@@ -131,7 +131,7 @@ class TestEntropyInterpretation:
             assert len(result) > 0
 
 
-# -- _check_trailing_data tests ----------------------------------------------─
+# -- _check_trailing_data tests -----------------------------------------------
 
 
 class TestCheckTrailingData:
@@ -241,7 +241,7 @@ class TestCheckTrailingData:
         assert result["found"] is False
 
 
-# -- file_triage tool tests --------------------------------------------------─
+# -- file_triage tool tests ---------------------------------------------------
 
 
 class TestFileTriage:
@@ -307,7 +307,7 @@ class TestFileTriage:
             os.unlink(path)
 
 
-# -- stego_analyze tool tests ------------------------------------------------─
+# -- stego_analyze tool tests -------------------------------------------------
 
 
 class TestStegoAnalyze:
@@ -574,7 +574,7 @@ class TestImageAnalysis:
             os.unlink(path)
 
 
-# -- JSON output validation --------------------------------------------------─
+# -- JSON output validation ---------------------------------------------------
 
 
 class TestJsonOutput:
@@ -605,7 +605,7 @@ class TestJsonOutput:
             os.unlink(path)
 
 
-# -- TestStegoMocked, mock stego helper functions --------------------------─
+# -- TestStegoMocked, mock stego helper functions ---------------------------
 
 
 class TestStegoMocked:

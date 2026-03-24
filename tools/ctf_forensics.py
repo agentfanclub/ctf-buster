@@ -120,22 +120,26 @@ def forensics_file_triage(path: str) -> str:
         ][:50]
         result["strings_total"] = len(all_strings)
 
+    file_data = None
     try:
-        data = safe_read_file(path, max_size=50_000_000)
-        result["entropy"] = round(_calculate_entropy(data), 4)
+        file_data = safe_read_file(path, max_size=50_000_000)
+        result["entropy"] = round(_calculate_entropy(file_data), 4)
         result["entropy_note"] = _entropy_interpretation(result["entropy"])
     except Exception:
         pass
 
-    result["trailing_data"] = _check_trailing_data(path, result.get("mime_type", ""))
+    result["trailing_data"] = _check_trailing_data(
+        path, result.get("mime_type", ""), data=file_data
+    )
 
     return json.dumps(result, indent=2)
 
 
-def _check_trailing_data(path, mime_type):
+def _check_trailing_data(path, mime_type, data=None):
     """Check if there's data appended after the file's logical end."""
     try:
-        data = safe_read_file(path, max_size=50_000_000)
+        if data is None:
+            data = safe_read_file(path, max_size=50_000_000)
         if "png" in mime_type:
             iend = data.find(b"IEND")
             if iend >= 0:
@@ -434,7 +438,7 @@ def _try_steghide(path, password):
     return findings
 
 
-# -- extract_embedded --------------------------------------------------------─
+# -- extract_embedded ---------------------------------------------------------
 
 
 @mcp.tool()
@@ -504,7 +508,7 @@ def forensics_extract_embedded(path: str) -> str:
     )
 
 
-# -- entropy_analysis --------------------------------------------------------─
+# -- entropy_analysis ---------------------------------------------------------
 
 
 def _calculate_entropy(data):
@@ -596,7 +600,7 @@ def forensics_entropy_analysis(path: str, block_size: int = 4096) -> str:
     )
 
 
-# -- image_analysis ----------------------------------------------------------─
+# -- image_analysis -----------------------------------------------------------
 
 
 @mcp.tool()

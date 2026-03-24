@@ -98,9 +98,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # ---- Install Rust stable toolchain via rustup (for development) -----------
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    sh -s -- -y --default-toolchain stable \
-              --component rust-src rust-analyzer clippy rustfmt
+    sh -s -- -y --default-toolchain stable
 ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup component add rust-src rust-analyzer clippy rustfmt
 
 # ---- Python packages (matching flake.nix pythonEnv) -----------------------
 RUN pip3 install --break-system-packages --no-cache-dir \
@@ -134,6 +134,12 @@ RUN pip3 install --break-system-packages --no-cache-dir \
     pytest \
     pytest-cov
 
+# ---- Install Node.js and Claude Code ----------------------------------------
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/* && \
+    npm install -g @anthropic-ai/claude-code
+
 # ---- Copy built CLI binary from builder stage -----------------------------
 COPY --from=builder /build/target/release/ctf /usr/local/bin/ctf
 
@@ -142,8 +148,15 @@ ARG USERNAME=ctf
 ARG USER_UID=1000
 ARG USER_GID=1000
 
-RUN groupadd --gid ${USER_GID} ${USERNAME} && \
-    useradd --uid ${USER_UID} --gid ${USER_GID} -m -s /bin/bash ${USERNAME} && \
+# Create user, handling cases where UID/GID already exist (e.g. Ubuntu's default user)
+RUN if id -u ${USER_UID} >/dev/null 2>&1; then \
+      existing=$(getent passwd ${USER_UID} | cut -d: -f1); \
+      usermod -l ${USERNAME} -d /home/${USERNAME} -m "$existing"; \
+      groupmod -n ${USERNAME} $(getent group ${USER_GID} | cut -d: -f1) 2>/dev/null || true; \
+    else \
+      groupadd --gid ${USER_GID} ${USERNAME} 2>/dev/null || true; \
+      useradd --uid ${USER_UID} --gid ${USER_GID} -m -s /bin/bash ${USERNAME}; \
+    fi && \
     echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/${USERNAME} && \
     chmod 0440 /etc/sudoers.d/${USERNAME}
 
@@ -159,6 +172,9 @@ ENV RUSTUP_HOME="/home/${USERNAME}/.rustup"
 # ---- Copy project source for development ----------------------------------
 WORKDIR /workspace
 COPY --chown=${USERNAME}:${USERNAME} . .
+
+# Ensure target dir is writable without volume mounts
+RUN mkdir -p /workspace/target && chown ${USERNAME}:${USERNAME} /workspace/target
 
 USER ${USERNAME}
 

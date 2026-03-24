@@ -1,0 +1,20 @@
+target/
+.direnv/
+.git/
+.claude/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+.env
+*.cookie
+*.token
+cookies.txt
+.mcp.json
+PLAN.md
+result
+
+# CTF workspace data
+pwnyctf/
+dicectf/
+test-workspace/

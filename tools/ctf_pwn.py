@@ -167,7 +167,7 @@ def pwn_triage(path: str) -> str:
     return _pwn_triage_impl(path)
 
 
-# -- pattern_offset ----------------------------------------------------------─
+# -- pattern_offset -----------------------------------------------------------
 
 
 @mcp.tool()
@@ -208,7 +208,7 @@ def pwn_pattern_offset(
     return json.dumps({"error": f"Unknown action: {action}"}, indent=2)
 
 
-# -- shellcode_generate ------------------------------------------------------─
+# -- shellcode_generate -------------------------------------------------------
 
 
 @mcp.tool()
@@ -276,7 +276,7 @@ def pwn_shellcode_generate(
             return json.dumps({"error": str(e)}, indent=2)
 
 
-# -- pwntools_template ------------------------------------------------------─
+# -- pwntools_template --------------------------------------------------------
 
 
 @mcp.tool()
@@ -456,7 +456,7 @@ def pwn_pwntools_template(
     )
 
 
-# -- angr_analyze ------------------------------------------------------------─
+# -- angr_analyze -------------------------------------------------------------
 
 
 @mcp.tool()
@@ -624,7 +624,7 @@ def pwn_angr_analyze(
     return json.dumps(result, indent=2)
 
 
-# -- libc_lookup --------------------------------------------------------------─
+# -- libc_lookup --------------------------------------------------------------
 
 
 @mcp.tool()
@@ -693,7 +693,7 @@ def pwn_libc_lookup(
     )
 
 
-# -- format_string ------------------------------------------------------------─
+# -- format_string ------------------------------------------------------------
 
 
 @mcp.tool()
@@ -705,76 +705,76 @@ def pwn_format_string(
     padding: int = 0,
 ) -> str:
     """Format string exploits. Modes: find_offset (probe), write (arbitrary write), info (reference)."""
-    import pwn
+    if mode == "find_offset":
+        probe = ".".join(f"%{i}$p" for i in range(1, 30))
+        return json.dumps(
+            {
+                "mode": "find_offset",
+                "probe_payload": probe,
+                "instructions": (
+                    "Send this payload as input. Look for '0x25702e25' (hex of '%p.%') "
+                    "or your input bytes in the output. The position N where your input "
+                    "appears is the format string offset. Use that as the 'offset' "
+                    "parameter in write mode."
+                ),
+            },
+            indent=2,
+        )
 
-    with pwn.context.local(arch=arch):
-        if mode == "find_offset":
-            probe = ".".join(f"%{i}$p" for i in range(1, 30))
-            return json.dumps(
-                {
-                    "mode": "find_offset",
-                    "probe_payload": probe,
-                    "instructions": (
-                        "Send this payload as input. Look for '0x25702e25' (hex of '%p.%') "
-                        "or your input bytes in the output. The position N where your input "
-                        "appears is the format string offset. Use that as the 'offset' "
-                        "parameter in write mode."
-                    ),
+    if mode == "info":
+        return json.dumps(
+            {
+                "mode": "info",
+                "format_specifiers": {
+                    "%p": "Print stack value as pointer (leak addresses)",
+                    "%s": "Print string at address on stack (arbitrary read)",
+                    "%n": "Write count of chars printed to address on stack",
+                    "%N$p": "Direct parameter access: print Nth stack value",
+                    "%N$n": "Write to address at Nth stack position",
+                    "%hhn": "Write single byte (mod 256)",
+                    "%hn": "Write 2 bytes (mod 65536)",
                 },
-                indent=2,
+                "exploit_steps": [
+                    "1. Find offset: send '%p.%p.%p...' to find where input appears on stack",
+                    "2. Leak addresses: use %N$p to read specific stack positions (libc, canary, etc.)",
+                    "3. Arbitrary read: place address on stack, use %N$s to read string there",
+                    "4. Arbitrary write: use pwn_format_string(mode='write', offset=N, writes='{\"addr\": \"val\"}')",
+                ],
+            },
+            indent=2,
+        )
+
+    if mode == "write":
+        import pwn
+
+        if not writes:
+            return json.dumps(
+                {"error": "write mode requires 'writes' parameter"}, indent=2
             )
+        try:
+            write_dict = {
+                int(addr, 16): int(val, 16)
+                for addr, val in json.loads(writes).items()
+            }
+        except (json.JSONDecodeError, ValueError) as e:
+            return json.dumps({"error": f"Invalid writes JSON: {e}"}, indent=2)
 
-        elif mode == "write":
-            if not writes:
-                return json.dumps(
-                    {"error": "write mode requires 'writes' parameter"}, indent=2
-                )
-            try:
-                write_dict = {
-                    int(addr, 16): int(val, 16)
-                    for addr, val in json.loads(writes).items()
-                }
-            except (json.JSONDecodeError, ValueError) as e:
-                return json.dumps({"error": f"Invalid writes JSON: {e}"}, indent=2)
-
+        with pwn.context.local(arch=arch):
             try:
                 payload = pwn.fmtstr_payload(offset, write_dict, numbwritten=padding)
             except Exception as e:
                 return json.dumps({"error": f"fmtstr_payload failed: {e}"}, indent=2)
 
-            return json.dumps(
-                {
-                    "mode": "write",
-                    "offset": offset,
-                    "writes": writes,
-                    "payload_hex": payload.hex(),
-                    "payload_length": len(payload),
-                },
-                indent=2,
-            )
-
-        elif mode == "info":
-            return json.dumps(
-                {
-                    "mode": "info",
-                    "format_specifiers": {
-                        "%p": "Print stack value as pointer (leak addresses)",
-                        "%s": "Print string at address on stack (arbitrary read)",
-                        "%n": "Write count of chars printed to address on stack",
-                        "%N$p": "Direct parameter access: print Nth stack value",
-                        "%N$n": "Write to address at Nth stack position",
-                        "%hhn": "Write single byte (mod 256)",
-                        "%hn": "Write 2 bytes (mod 65536)",
-                    },
-                    "exploit_steps": [
-                        "1. Find offset: send '%p.%p.%p...' to find where input appears on stack",
-                        "2. Leak addresses: use %N$p to read specific stack positions (libc, canary, etc.)",
-                        "3. Arbitrary read: place address on stack, use %N$s to read string there",
-                        "4. Arbitrary write: use pwn_format_string(mode='write', offset=N, writes='{\"addr\": \"val\"}')",
-                    ],
-                },
-                indent=2,
-            )
+        return json.dumps(
+            {
+                "mode": "write",
+                "offset": offset,
+                "writes": writes,
+                "payload_hex": payload.hex(),
+                "payload_length": len(payload),
+            },
+            indent=2,
+        )
 
     return json.dumps({"error": f"Unknown mode: {mode}"}, indent=2)
 

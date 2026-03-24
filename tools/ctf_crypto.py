@@ -3,7 +3,6 @@
 
 import base64
 import codecs
-import hashlib
 import json
 import os
 import re
@@ -14,7 +13,6 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(__file__))
 from fastmcp import FastMCP
-from lib.subprocess_utils import run_tool
 
 mcp = FastMCP(
     "ctf-crypto",
@@ -456,7 +454,30 @@ def crypto_rsa_toolkit(
     return json.dumps(results, indent=2)
 
 
-# -- math_solve --------------------------------------------------------------─
+# -- math_solve ---------------------------------------------------------------
+
+_BLOCKED_EVAL_PATTERNS = [
+    "import", "exec", "eval", "compile", "open",
+    "getattr", "setattr", "delattr", "globals", "locals",
+    "vars", "dir", "type(", "breakpoint", "exit", "quit",
+    "subprocess", "os.", "sys.", "shutil",
+]
+
+_ALLOWED_SYMPY = {
+    "Integer", "Rational", "Float", "pi", "E", "I", "oo", "zoo", "nan",
+    "sqrt", "cbrt", "root", "Abs", "sign", "ceiling", "floor",
+    "factorial", "binomial", "gcd", "lcm", "mod_inverse",
+    "isprime", "nextprime", "prevprime", "prime", "primerange",
+    "factorint", "divisors", "totient",
+    "log", "ln", "exp", "sin", "cos", "tan",
+    "Mod", "Pow", "Add", "Mul",
+    "solve", "simplify", "expand", "factor",
+    "Symbol", "symbols", "Eq", "Ne", "Lt", "Gt", "Le", "Ge",
+    "Matrix", "eye", "zeros", "ones",
+    "integer_nthroot", "igcd", "ilcm", "isqrt", "iroot",
+    "Poly", "gcdex", "invert", "discrete_log", "nthroot_mod",
+    "crt", "primitive_root",
+}
 
 
 @mcp.tool()
@@ -465,22 +486,6 @@ def crypto_math_solve(mode: str, expression: str, variables: str = "") -> str:
     if mode == "eval":
         import sympy
 
-        # Create a safe namespace with only math-related sympy functions
-        _ALLOWED_SYMPY = {
-            "Integer", "Rational", "Float", "pi", "E", "I", "oo", "zoo", "nan",
-            "sqrt", "cbrt", "root", "Abs", "sign", "ceiling", "floor",
-            "factorial", "binomial", "gcd", "lcm", "mod_inverse",
-            "isprime", "nextprime", "prevprime", "prime", "primerange",
-            "factorint", "divisors", "totient",
-            "log", "ln", "exp", "sin", "cos", "tan",
-            "Mod", "Pow", "Add", "Mul",
-            "solve", "simplify", "expand", "factor",
-            "Symbol", "symbols", "Eq", "Ne", "Lt", "Gt", "Le", "Ge",
-            "Matrix", "eye", "zeros", "ones",
-            "integer_nthroot", "igcd", "ilcm", "isqrt", "iroot",
-            "Poly", "gcdex", "invert", "discrete_log", "nthroot_mod",
-            "crt", "primitive_root",
-        }
         ns = {}
         for name in _ALLOWED_SYMPY:
             if hasattr(sympy, name):
@@ -496,12 +501,8 @@ def crypto_math_solve(mode: str, expression: str, variables: str = "") -> str:
             return json.dumps(
                 {"error": "Expression contains forbidden dunder access"}, indent=2
             )
-        _BLOCKED_PATTERNS = ["import", "exec", "eval", "compile", "open",
-                             "getattr", "setattr", "delattr", "globals", "locals",
-                             "vars", "dir", "type(", "breakpoint", "exit", "quit",
-                             "subprocess", "os.", "sys.", "shutil"]
         expr_lower = expression.lower()
-        for pat in _BLOCKED_PATTERNS:
+        for pat in _BLOCKED_EVAL_PATTERNS:
             if pat in expr_lower:
                 return json.dumps(
                     {"error": f"Expression contains forbidden pattern: {pat}"}, indent=2
@@ -530,11 +531,6 @@ def crypto_math_solve(mode: str, expression: str, variables: str = "") -> str:
         solver = z3.Solver()
         constraints = [c.strip() for c in expression.split(";") if c.strip()]
 
-        _BLOCKED_PATTERNS = ["import", "exec", "eval", "compile", "open",
-                             "getattr", "setattr", "delattr", "globals", "locals",
-                             "vars", "dir", "type(", "breakpoint", "subprocess",
-                             "os.", "sys.", "shutil"]
-
         for constraint in constraints:
             if "__" in constraint:
                 return json.dumps(
@@ -544,7 +540,7 @@ def crypto_math_solve(mode: str, expression: str, variables: str = "") -> str:
                     indent=2,
                 )
             constraint_lower = constraint.lower()
-            for pat in _BLOCKED_PATTERNS:
+            for pat in _BLOCKED_EVAL_PATTERNS:
                 if pat in constraint_lower:
                     return json.dumps(
                         {"error": f"Constraint contains forbidden pattern '{pat}': '{constraint}'"},
@@ -575,96 +571,9 @@ def crypto_math_solve(mode: str, expression: str, variables: str = "") -> str:
     return json.dumps({"error": f"Unknown mode: {mode}"}, indent=2)
 
 
-# -- frequency_analysis ------------------------------------------------------─
+# -- frequency_analysis -------------------------------------------------------
 
-
-@mcp.tool()
-def crypto_frequency_analysis(text: str) -> str:
-    """Perform frequency analysis on text for classical cipher analysis.
-
-    Returns character frequencies, bigram frequencies, and chi-squared English score.
-    """
-    # English letter frequencies
-    english_freq = {
-        "a": 8.167,
-        "b": 1.492,
-        "c": 2.782,
-        "d": 4.253,
-        "e": 12.702,
-        "f": 2.228,
-        "g": 2.015,
-        "h": 6.094,
-        "i": 6.966,
-        "j": 0.153,
-        "k": 0.772,
-        "l": 4.025,
-        "m": 2.406,
-        "n": 6.749,
-        "o": 7.507,
-        "p": 1.929,
-        "q": 0.095,
-        "r": 5.987,
-        "s": 6.327,
-        "t": 9.056,
-        "u": 2.758,
-        "v": 0.978,
-        "w": 2.360,
-        "x": 0.150,
-        "y": 1.974,
-        "z": 0.074,
-    }
-
-    letters_only = [c.lower() for c in text if c.isalpha()]
-    total = len(letters_only)
-
-    if total == 0:
-        return json.dumps({"error": "No alphabetic characters found"}, indent=2)
-
-    # Character frequency
-    char_counts = Counter(letters_only)
-    char_freq = {
-        ch: round(count / total * 100, 3) for ch, count in char_counts.most_common()
-    }
-
-    # Bigram frequency
-    bigrams = [
-        letters_only[i] + letters_only[i + 1] for i in range(len(letters_only) - 1)
-    ]
-    bigram_counts = Counter(bigrams)
-    top_bigrams = dict(bigram_counts.most_common(15))
-
-    # Chi-squared against English
-    chi_sq = 0
-    for letter in string.ascii_lowercase:
-        observed = char_counts.get(letter, 0) / total * 100
-        expected = english_freq.get(letter, 0)
-        if expected > 0:
-            chi_sq += (observed - expected) ** 2 / expected
-
-    # Index of coincidence
-    ioc = (
-        sum(c * (c - 1) for c in char_counts.values()) / (total * (total - 1))
-        if total > 1
-        else 0
-    )
-
-    return json.dumps(
-        {
-            "total_letters": total,
-            "character_frequencies": char_freq,
-            "top_bigrams": top_bigrams,
-            "chi_squared_english": round(chi_sq, 2),
-            "index_of_coincidence": round(ioc, 5),
-            "likely_english": chi_sq < 50,
-            "ioc_note": "English ~0.0667, random ~0.0385",
-        },
-        indent=2,
-    )
-
-
-# -- xor_analyze --------------------------------------------------------------─
-
-# English letter frequencies (shared with frequency_analysis)
+# English letter frequencies (used by frequency_analysis and xor_analyze)
 _ENGLISH_FREQ = {
     "a": 8.167,
     "b": 1.492,
@@ -693,6 +602,63 @@ _ENGLISH_FREQ = {
     "y": 1.974,
     "z": 0.074,
 }
+
+
+@mcp.tool()
+def crypto_frequency_analysis(text: str) -> str:
+    """Perform frequency analysis on text for classical cipher analysis.
+
+    Returns character frequencies, bigram frequencies, and chi-squared English score.
+    """
+    letters_only = [c.lower() for c in text if c.isalpha()]
+    total = len(letters_only)
+
+    if total == 0:
+        return json.dumps({"error": "No alphabetic characters found"}, indent=2)
+
+    # Character frequency
+    char_counts = Counter(letters_only)
+    char_freq = {
+        ch: round(count / total * 100, 3) for ch, count in char_counts.most_common()
+    }
+
+    # Bigram frequency
+    bigrams = [
+        letters_only[i] + letters_only[i + 1] for i in range(len(letters_only) - 1)
+    ]
+    bigram_counts = Counter(bigrams)
+    top_bigrams = dict(bigram_counts.most_common(15))
+
+    # Chi-squared against English
+    chi_sq = 0
+    for letter in string.ascii_lowercase:
+        observed = char_counts.get(letter, 0) / total * 100
+        expected = _ENGLISH_FREQ.get(letter, 0)
+        if expected > 0:
+            chi_sq += (observed - expected) ** 2 / expected
+
+    # Index of coincidence
+    ioc = (
+        sum(c * (c - 1) for c in char_counts.values()) / (total * (total - 1))
+        if total > 1
+        else 0
+    )
+
+    return json.dumps(
+        {
+            "total_letters": total,
+            "character_frequencies": char_freq,
+            "top_bigrams": top_bigrams,
+            "chi_squared_english": round(chi_sq, 2),
+            "index_of_coincidence": round(ioc, 5),
+            "likely_english": chi_sq < 50,
+            "ioc_note": "English ~0.0667, random ~0.0385",
+        },
+        indent=2,
+    )
+
+
+# -- xor_analyze --------------------------------------------------------------
 
 
 def _chi_squared_score(data: bytes) -> float:

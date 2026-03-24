@@ -411,7 +411,7 @@ class TestCryptoIdentify:
         assert all("type" in r and "confidence" in r for r in parsed)
 
 
-# -- frequency_analysis tests ------------------------------------------------─
+# -- frequency_analysis tests -------------------------------------------------
 
 
 class TestFrequencyAnalysis:
@@ -475,7 +475,7 @@ class TestFrequencyAnalysis:
         assert "character_frequencies" in parsed
 
 
-# -- crypto_rsa_toolkit tests ------------------------------------------------─
+# -- crypto_rsa_toolkit tests -------------------------------------------------
 
 rsa_toolkit = _unwrap(ctf_crypto.crypto_rsa_toolkit)
 
@@ -835,7 +835,7 @@ class TestCryptoIdentifyCaesar:
         assert isinstance(idents, list)
 
 
-# -- TestCryptoRsaFactordbMocked --------------------------------------------─
+# -- TestCryptoRsaFactordbMocked ---------------------------------------------
 
 
 class TestCryptoRsaFactordbMocked:

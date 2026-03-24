@@ -88,24 +88,31 @@ pub fn delete_token(workspace_name: &str) -> Result<()> {
   Ok(())
 }
 
-pub async fn handle_login(workspace_name: &str, platform_url: &str) -> Result<()> {
-  let token: String =
-    Password::new().with_prompt("API token").interact().map_err(|e| Error::Auth(e.to_string()))?;
-
-  // Verify the token works
+/// Verify a token against the platform, store it, and print login status.
+async fn verify_and_store_token(
+  workspace_name: &str,
+  platform_url: &str,
+  token: &str,
+) -> Result<()> {
   let config = PlatformConfig { platform_type: None, url: platform_url.to_string(), token: None };
-
-  let plat = platform::create_platform(&config, &token).await?;
+  let plat = platform::create_platform(&config, token).await?;
   let info = plat.whoami().await?;
 
-  store_token(workspace_name, &token)?;
+  store_token(workspace_name, token)?;
 
-  println!("{} Logged in as {} (score: {})", "✓".green().bold(), info.name.bold(), info.score,);
+  println!("{} Logged in as {} (score: {})", "✓".green().bold(), info.name.bold(), info.score);
   if let Some(rank) = info.rank {
     println!("  Rank: #{rank}");
   }
 
   Ok(())
+}
+
+pub async fn handle_login(workspace_name: &str, platform_url: &str) -> Result<()> {
+  let token: String =
+    Password::new().with_prompt("API token").interact().map_err(|e| Error::Auth(e.to_string()))?;
+
+  verify_and_store_token(workspace_name, platform_url, &token).await
 }
 
 pub async fn handle_login_interactive() -> Result<()> {
@@ -122,19 +129,7 @@ pub async fn handle_login_interactive() -> Result<()> {
   let token: String =
     Password::new().with_prompt("API token").interact().map_err(|e| Error::Auth(e.to_string()))?;
 
-  let config = PlatformConfig { platform_type: None, url: url.clone(), token: None };
-
-  let plat = platform::create_platform(&config, &token).await?;
-  let info = plat.whoami().await?;
-
-  store_token(&workspace_name, &token)?;
-
-  println!("{} Logged in as {} (score: {})", "✓".green().bold(), info.name.bold(), info.score,);
-  if let Some(rank) = info.rank {
-    println!("  Rank: #{rank}");
-  }
-
-  Ok(())
+  verify_and_store_token(&workspace_name, &url, &token).await
 }
 
 pub async fn handle_logout(workspace_name: &str) -> Result<()> {

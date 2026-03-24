@@ -15,11 +15,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
 }
 
 fn draw_header(frame: &mut Frame, area: Rect, app: &App) {
-  let sync_ago = app
+  let sync_label = app
     .state
     .last_sync
-    .map(|t| {
-      let secs = (chrono::Utc::now() - t).num_seconds();
+    .map(|timestamp| {
+      let secs = (chrono::Utc::now() - timestamp).num_seconds();
       if secs < 60 {
         format!("{secs}s ago")
       } else if secs < 3600 {
@@ -39,24 +39,24 @@ fn draw_header(frame: &mut Frame, area: Rect, app: &App) {
     ),
     Span::styled(format!("({} pts) ", app.total_points()), Style::default().fg(Color::Yellow)),
     Span::raw(" | "),
-    Span::raw(format!("Synced: {sync_ago} ")),
+    Span::raw(format!("Synced: {sync_label} ")),
   ]);
 
   let block =
     Block::bordered().title(" ctf-buster ").border_style(Style::default().fg(Color::DarkGray));
-  let para = Paragraph::new(line).block(block);
-  frame.render_widget(para, area);
+  let paragraph = Paragraph::new(line).block(block);
+  frame.render_widget(paragraph, area);
 }
 
 fn draw_body(frame: &mut Frame, area: Rect, app: &App) {
-  let cols =
+  let columns =
     Layout::horizontal([Constraint::Percentage(60), Constraint::Percentage(40)]).split(area);
 
   let left =
-    Layout::vertical([Constraint::Percentage(70), Constraint::Percentage(30)]).split(cols[0]);
+    Layout::vertical([Constraint::Percentage(70), Constraint::Percentage(30)]).split(columns[0]);
 
   let right =
-    Layout::vertical([Constraint::Percentage(60), Constraint::Percentage(40)]).split(cols[1]);
+    Layout::vertical([Constraint::Percentage(60), Constraint::Percentage(40)]).split(columns[1]);
 
   draw_challenges_table(frame, left[0], app);
   draw_categories(frame, left[1], app);
@@ -111,53 +111,54 @@ fn draw_challenges_table(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn draw_queue(frame: &mut Frame, area: Rect, app: &App) {
-  let orch = &app.state.orchestration;
+  let orchestration = &app.state.orchestration;
   let mut lines = Vec::new();
 
   lines.push(Line::from(Span::styled(
-    format!("Queued: {}", orch.queue.len()),
+    format!("Queued: {}", orchestration.queue.len()),
     Style::default().fg(Color::White).bold(),
   )));
-  for q in orch.queue.iter().take(10) {
-    lines.push(Line::from(format!("  {} ({}, p{})", q.name, q.category, q.priority)));
+  for entry in orchestration.queue.iter().take(10) {
+    lines.push(Line::from(format!("  {} ({}, p{})", entry.name, entry.category, entry.priority)));
   }
-  if orch.queue.len() > 10 {
+  if orchestration.queue.len() > 10 {
     lines.push(
-      Line::from(format!("  ... and {} more", orch.queue.len() - 10))
+      Line::from(format!("  ... and {} more", orchestration.queue.len() - 10))
         .style(Style::default().fg(Color::DarkGray)),
     );
   }
 
   lines.push(Line::from(""));
   lines.push(Line::from(Span::styled(
-    format!("In Progress: {}", orch.in_progress.len()),
+    format!("In Progress: {}", orchestration.in_progress.len()),
     Style::default().fg(Color::Yellow).bold(),
   )));
-  for name in &orch.in_progress {
+  for name in &orchestration.in_progress {
     lines.push(Line::from(format!("  {name}")).style(Style::default().fg(Color::Yellow)));
   }
 
   lines.push(Line::from(""));
   lines.push(Line::from(Span::styled(
-    format!("Failed: {}", orch.failed.len()),
+    format!("Failed: {}", orchestration.failed.len()),
     Style::default().fg(Color::Red).bold(),
   )));
-  for f in orch.failed.iter().take(5) {
+  for failure in orchestration.failed.iter().take(5) {
     lines.push(
-      Line::from(format!("  {} ({})", f.name, f.notes)).style(Style::default().fg(Color::Red)),
+      Line::from(format!("  {} ({})", failure.name, failure.notes))
+        .style(Style::default().fg(Color::Red)),
     );
   }
 
   let block = panel_border("Queue", app.active_panel == ActivePanel::Queue);
-  let para = Paragraph::new(lines).block(block).wrap(Wrap { trim: true });
-  frame.render_widget(para, area);
+  let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: true });
+  frame.render_widget(paragraph, area);
 }
 
 fn draw_categories(frame: &mut Frame, area: Rect, app: &App) {
-  let cats = app.categories();
+  let category_stats = app.categories();
   let mut lines = Vec::new();
 
-  for (cat, solved, total) in &cats {
+  for (name, solved, total) in &category_stats {
     let style = if *solved == *total && *total > 0 {
       Style::default().fg(Color::Green)
     } else if *solved > 0 {
@@ -165,17 +166,17 @@ fn draw_categories(frame: &mut Frame, area: Rect, app: &App) {
     } else {
       Style::default().fg(Color::DarkGray)
     };
-    lines.push(Line::from(format!("  {cat:<16} {solved}/{total}")).style(style));
+    lines.push(Line::from(format!("  {name:<16} {solved}/{total}")).style(style));
   }
 
-  if cats.is_empty() {
+  if category_stats.is_empty() {
     lines.push(Line::from("  No challenges synced").style(Style::default().fg(Color::DarkGray)));
   }
 
   let block =
     Block::bordered().title(" Categories ").border_style(Style::default().fg(Color::DarkGray));
-  let para = Paragraph::new(lines).block(block);
-  frame.render_widget(para, area);
+  let paragraph = Paragraph::new(lines).block(block);
+  frame.render_widget(paragraph, area);
 }
 
 fn draw_notifications(frame: &mut Frame, area: Rect, app: &App) {
@@ -198,8 +199,8 @@ fn draw_notifications(frame: &mut Frame, area: Rect, app: &App) {
   }
 
   let block = panel_border("Notifications", app.active_panel == ActivePanel::Notifications);
-  let para = Paragraph::new(lines).block(block).wrap(Wrap { trim: true });
-  frame.render_widget(para, area);
+  let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: true });
+  frame.render_widget(paragraph, area);
 }
 
 fn draw_footer(frame: &mut Frame, area: Rect) {

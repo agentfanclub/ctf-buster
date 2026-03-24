@@ -58,7 +58,7 @@ class TestBuildGdbScript:
         assert "quit" in script
 
 
-# -- _parse_registers tests --------------------------------------------------─
+# -- _parse_registers tests ---------------------------------------------------
 
 
 class TestParseRegisters:
@@ -105,7 +105,7 @@ class TestParseRegisters:
         assert regs["rip"]["hex"] == "0x401000"
 
 
-# -- _parse_backtrace tests --------------------------------------------------─
+# -- _parse_backtrace tests ---------------------------------------------------
 
 
 class TestParseBacktrace:
@@ -129,7 +129,7 @@ class TestParseBacktrace:
         assert len(frames) == 1
 
 
-# -- _parse_memory tests ----------------------------------------------------─
+# -- _parse_memory tests -----------------------------------------------------
 
 
 class TestParseMemory:
@@ -150,7 +150,7 @@ class TestParseMemory:
         assert len(lines) == 1
 
 
-# -- _write_temp tests ------------------------------------------------------─
+# -- _write_temp tests -------------------------------------------------------
 
 
 class TestWriteTemp:
@@ -357,7 +357,7 @@ class TestGdbTraceInput:
             os.unlink(path)
 
 
-# -- gdb_checksec_runtime tool tests ----------------------------------------─
+# -- gdb_checksec_runtime tool tests -----------------------------------------
 
 
 class TestGdbChecksecRuntime:
